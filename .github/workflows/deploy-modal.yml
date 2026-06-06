@@ -23,10 +23,14 @@ jobs:
       - name: Install deps
         run: pip install modal pydantic google-generativeai supabase yt-dlp
 
-      - name: Deploy to Modal
-        uses: modal-labs/deploy-modal-app@v1
-        with:
-          app-file: modal_pipeline/main.py
-        env:
-          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      - name: Write Modal token config
+        run: |
+          mkdir -p ~/.modal
+          cat > ~/.modal.toml <<EOF
+          [default]
+          token_id = "${{ secrets.MODAL_TOKEN_ID }}"
+          token_secret = "${{ secrets.MODAL_TOKEN_SECRET }}"
+          EOF
+
+      - name: Deploy pipeline
+        run: modal deploy modal_pipeline/main.py
