@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Job, STEP_LABELS, JobStep } from "@/lib/jobs/types";
 import { track } from "@/lib/mixpanel";
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, RotateCcw, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 
 interface Props {
   jobId: string;
   onComplete?: (videoId: string) => void;
+  onDismiss?: () => void;
 }
 
 const STEPS: JobStep[] = [
@@ -21,18 +22,18 @@ const STEPS: JobStep[] = [
   "storing",
 ];
 
-export default function JobStatusCard({ jobId, onComplete }: Props) {
+export default function JobStatusCard({ jobId, onComplete, onDismiss }: Props) {
   const [job, setJob] = useState<Job | null>(null);
+  const [fetchError, setFetchError] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
-    // Initial fetch
     fetch(`/api/jobs/${jobId}`)
       .then((r) => r.json())
-      .then(setJob);
+      .then(setJob)
+      .catch(() => setFetchError(true));
 
-    // Subscribe to Supabase Realtime for live updates
     const channel = supabase
       .channel(`job-${jobId}`)
       .on(
@@ -56,6 +57,26 @@ export default function JobStatusCard({ jobId, onComplete }: Props) {
 
     return () => { supabase.removeChannel(channel); };
   }, [jobId]);
+
+  // Network/fetch error — couldn't even load job
+  if (fetchError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-800">Couldn't load job status</p>
+            <p className="text-xs text-red-600 mt-1">Check your connection and refresh the page.</p>
+          </div>
+          {onDismiss && (
+            <button onClick={onDismiss} className="text-red-400 hover:text-red-600 transition-colors">
+              <XCircle className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (!job) return null;
 
@@ -122,6 +143,26 @@ export default function JobStatusCard({ jobId, onComplete }: Props) {
         <p className="mt-3 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
           {job.error_message}
         </p>
+      )}
+
+      {job.status === "failed" && (
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={onDismiss}
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-200 hover:border-gray-300 py-2 rounded-lg transition-colors"
+          >
+            <XCircle className="w-3.5 h-3.5" /> Dismiss
+          </button>
+          <button
+            onClick={() => {
+              track("job_retry_clicked", { job_id: jobId });
+              onDismiss?.();
+            }}
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-800 border border-purple-200 hover:border-purple-300 bg-purple-50 hover:bg-purple-100 py-2 rounded-lg transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Try again
+          </button>
+        </div>
       )}
     </div>
   );

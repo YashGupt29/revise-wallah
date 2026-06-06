@@ -49,6 +49,10 @@ export default function DashboardClient({ initialNotes }: Props) {
     router.refresh();
   }
 
+  function handleJobDismiss() {
+    setActiveJobId(null);
+  }
+
   return (
     <div>
       {/* URL input */}
@@ -65,7 +69,7 @@ export default function DashboardClient({ initialNotes }: Props) {
       {/* Active job */}
       {activeJobId && (
         <div className="mb-6">
-          <JobStatusCard jobId={activeJobId} onComplete={handleJobComplete} />
+          <JobStatusCard jobId={activeJobId} onComplete={handleJobComplete} onDismiss={handleJobDismiss} />
         </div>
       )}
 
