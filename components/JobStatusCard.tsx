@@ -80,7 +80,10 @@ export default function JobStatusCard({ jobId, onComplete, onDismiss }: Props) {
 
   if (!job) return null;
 
-  const currentStepIndex = STEPS.indexOf(job.current_step as JobStep);
+  // While queued (Modal cold-starting), treat first step as active
+  const isQueued = job.status === "queued" || (!job.current_step && job.status !== "done" && job.status !== "failed");
+  const activeStep = isQueued ? STEPS[0] : (job.current_step as JobStep);
+  const currentStepIndex = STEPS.indexOf(activeStep);
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
@@ -90,26 +93,27 @@ export default function JobStatusCard({ jobId, onComplete, onDismiss }: Props) {
         </p>
         {job.status === "done" && <CheckCircle2 className="w-5 h-5 text-green-500" />}
         {job.status === "failed" && <XCircle className="w-5 h-5 text-red-500" />}
-        {job.status === "processing" && (
+        {(job.status === "processing" || isQueued) && (
           <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
         )}
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar — pulse while queued */}
       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-4">
         <div
           className={clsx(
             "h-full rounded-full transition-all duration-700",
-            job.status === "failed" ? "bg-red-400" : "bg-purple-500"
+            job.status === "failed" ? "bg-red-400" : "bg-purple-500",
+            isQueued && "animate-pulse w-[5%]"
           )}
-          style={{ width: `${job.progress}%` }}
+          style={isQueued ? undefined : { width: `${job.progress}%` }}
         />
       </div>
 
       {/* Step list */}
       <div className="space-y-2">
         {STEPS.map((step, i) => {
-          const isActive = step === job.current_step;
+          const isActive = step === activeStep;
           const isDone = currentStepIndex > i || job.status === "done";
           const isFailed = job.status === "failed" && isActive;
 
