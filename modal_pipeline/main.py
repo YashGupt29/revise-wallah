@@ -2,73 +2,39 @@
 Modal app — entry point for the Revise Wallah pipeline.
 
 Architecture:
-  run_pipeline()       — orchestrator, called by Next.js API
-  _step_extract()      — yt-dlp audio download
-  _step_transcribe()   — faster-whisper transcription
-  _step_generate()     — Gemini 2.5 Flash note generation
-  _step_parse_store()  — parser + Supabase write
+  trigger()        — web endpoint, receives transcript from Next.js, spawns run_pipeline
+  run_pipeline()   — orchestrator: LLM generation + Supabase storage
 
-Each step updates job status in Supabase so the frontend
-can show live progress via Supabase Realtime.
+Transcript is fetched by Next.js (not blocked by YouTube).
+Modal only runs LLM generation — no YouTube access needed.
 """
 
-import os
-import tempfile
-
 import modal
-
 from pydantic import BaseModel
 
 from modal_pipeline.utils.supabase_client import get_supabase
-from modal_pipeline.services.transcript_fetcher import fetch_transcript
-from modal_pipeline.services.audio import extract_audio
-from modal_pipeline.services.transcriber import transcribe
 from modal_pipeline.services.generator import generate_notes
 from modal_pipeline.services import parser
 
-# ─── Modal image definition ──────────────────────────────────────────────────
+# ─── Modal image ─────────────────────────────────────────────────────────────
 
 pipeline_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install(
-        "youtube-transcript-api==0.5.0",
-        "yt-dlp==2024.12.13",
-        "faster-whisper==1.1.0",
         "google-genai>=1.0.0",
         "supabase==2.10.0",
         "pydantic==2.10.3",
         "fastapi[standard]>=0.115.0",
     )
-    .apt_install("ffmpeg")
     .add_local_python_source("modal_pipeline")
 )
 
 app = modal.App("revise-wallah-pipeline", image=pipeline_image)
 
-# ─── Secrets — injected from Modal secret store, not env ─────────────────────
-# Set these via: modal secret create revise-wallah-secrets KEY=value
-
 pipeline_secrets = modal.Secret.from_name("revise-wallah-secrets")
 
 
 # ─── Job status helper ────────────────────────────────────────────────────────
-
-def _fetch_metadata(youtube_url: str) -> dict:
-    """Fetch video metadata using YouTube oEmbed API — no auth, no bot detection."""
-    import urllib.request
-    import urllib.parse
-    import json
-
-    oembed_url = "https://www.youtube.com/oembed?url=" + urllib.parse.quote(youtube_url) + "&format=json"
-    with urllib.request.urlopen(oembed_url, timeout=10) as resp:
-        data = json.loads(resp.read())
-
-    return {
-        "title": data.get("title", ""),
-        "channel_name": data.get("author_name", ""),
-        "duration_seconds": 0,  # oEmbed doesn't provide duration; updated after transcription
-    }
-
 
 def _update_job(job_id: str, status: str, step: str, progress: int, error: str = None):
     """Update job record in Supabase — triggers Realtime event on frontend."""
@@ -91,28 +57,29 @@ def _update_job(job_id: str, status: str, step: str, progress: int, error: str =
     secrets=[pipeline_secrets],
     retries=modal.Retries(max_retries=1, backoff_coefficient=1.0),
 )
-def run_pipeline(job_id: str, youtube_url: str, url_hash: str):
+def run_pipeline(
+    job_id: str,
+    youtube_url: str,
+    url_hash: str,
+    transcript: str,
+    language: str,
+    title: str,
+    channel_name: str,
+    duration_seconds: int,
+):
     """
-    Full pipeline: YouTube URL → structured notes stored in Supabase.
-
-    Called asynchronously by the Next.js API.
-    Updates job.status at each step so the UI shows live progress.
+    LLM pipeline: transcript → structured notes stored in Supabase.
+    Transcript is pre-fetched by Next.js — no YouTube access needed here.
     """
     sb = get_supabase()
 
     try:
-        # ── Step 1: Fetch transcript ──────────────────────────────────────────
-        _update_job(job_id, "processing", "extracting", 10)
-        transcript, language = fetch_transcript(youtube_url)
-        metadata = _fetch_metadata(youtube_url)
-
-        # ── Step 2: Generate notes ───────────────────────────────────────────
-        _update_job(job_id, "processing", "generating", 65)
+        # ── Step 1: Generate notes with Gemini ───────────────────────────────
+        _update_job(job_id, "processing", "generating", 30)
         content = generate_notes(transcript)
 
-        # ── Step 4: Parse into all formats ───────────────────────────────────
-        _update_job(job_id, "processing", "parsing", 85)
-
+        # ── Step 2: Parse into all formats ───────────────────────────────────
+        _update_job(job_id, "processing", "parsing", 70)
         structured_md = parser.to_structured_markdown(content)
         handwritten_html = parser.to_handwritten_html(content)
         flashcards = parser.to_flashcards(content)
@@ -120,18 +87,17 @@ def run_pipeline(job_id: str, youtube_url: str, url_hash: str):
         concepts = parser.to_concepts(content)
         relationships = parser.to_concept_relationships(content)
 
-        # ── Step 5: Store processed video (shared cache) ─────────────────────
+        # ── Step 3: Store processed video ────────────────────────────────────
         _update_job(job_id, "processing", "storing", 90)
-
         video_row = (
             sb.table("processed_videos")
             .upsert(
                 {
                     "url_hash": url_hash,
                     "youtube_url": youtube_url,
-                    "title": metadata["title"],
-                    "channel_name": metadata["channel_name"],
-                    "duration_seconds": metadata["duration_seconds"],
+                    "title": title,
+                    "channel_name": channel_name,
+                    "duration_seconds": duration_seconds,
                     "language": language,
                     "transcript": transcript,
                     "notes_json": content.model_dump(),
@@ -147,10 +113,10 @@ def run_pipeline(job_id: str, youtube_url: str, url_hash: str):
         )
         processed_video_id = video_row.data[0]["id"]
 
-        # ── Step 6: Store graph seeds (concepts + relationships) ─────────────
+        # ── Step 4: Store graph seeds (non-blocking) ─────────────────────────
         _store_concepts(sb, processed_video_id, concepts, relationships)
 
-        # ── Step 7: Mark job done ─────────────────────────────────────────────
+        # ── Done ─────────────────────────────────────────────────────────────
         sb.table("jobs").update(
             {"status": "done", "progress": 100, "current_step": "done",
              "processed_video_id": processed_video_id}
@@ -158,7 +124,6 @@ def run_pipeline(job_id: str, youtube_url: str, url_hash: str):
 
     except Exception as exc:
         _update_job(job_id, "failed", "failed", 0, error=str(exc))
-        # Also mark the cached video as failed so retries work
         sb.table("processed_videos").update({"status": "failed"}).eq(
             "url_hash", url_hash
         ).execute()
@@ -166,10 +131,7 @@ def run_pipeline(job_id: str, youtube_url: str, url_hash: str):
 
 
 def _store_concepts(sb, processed_video_id: str, concepts: list[dict], relationships: list[dict]):
-    """
-    Upsert concepts and relationships into graph seed tables.
-    Non-blocking — failures here don't fail the job.
-    """
+    """Upsert graph seed data. Non-blocking — failures don't fail the job."""
     try:
         for concept in concepts:
             result = (
@@ -185,8 +147,6 @@ def _store_concepts(sb, processed_video_id: str, concepts: list[dict], relations
                 .execute()
             )
             concept_id = result.data[0]["id"]
-
-            # Link concept to this video
             sb.table("video_concepts").upsert(
                 {
                     "processed_video_id": processed_video_id,
@@ -196,7 +156,6 @@ def _store_concepts(sb, processed_video_id: str, concepts: list[dict], relations
                 on_conflict="processed_video_id,concept_id",
             ).execute()
 
-        # Store relationships — look up concept IDs by name
         for rel in relationships:
             a = sb.table("concepts").select("id").eq("name", rel["from_concept"]).execute()
             b = sb.table("concepts").select("id").eq("name", rel["to_concept"]).execute()
@@ -210,27 +169,34 @@ def _store_concepts(sb, processed_video_id: str, concepts: list[dict], relations
                     on_conflict="concept_a_id,concept_b_id,relationship_type",
                 ).execute()
     except Exception:
-        pass  # graph seeds are non-critical — don't fail the job
+        pass
 
 
-# ─── Web endpoint — called by Next.js API ────────────────────────────────────
+# ─── Web endpoint ─────────────────────────────────────────────────────────────
 
 class TriggerRequest(BaseModel):
     job_id: str
     youtube_url: str
     url_hash: str
+    transcript: str
+    language: str
+    title: str
+    channel_name: str
+    duration_seconds: int
 
 
 @app.function(secrets=[pipeline_secrets])
 @modal.fastapi_endpoint(method="POST")
 def trigger(req: TriggerRequest):
-    """
-    HTTP entry point for the Next.js API.
-    Spawns run_pipeline asynchronously and returns immediately.
-    """
+    """Receives transcript from Next.js and spawns run_pipeline."""
     run_pipeline.spawn(
         job_id=req.job_id,
         youtube_url=req.youtube_url,
         url_hash=req.url_hash,
+        transcript=req.transcript,
+        language=req.language,
+        title=req.title,
+        channel_name=req.channel_name,
+        duration_seconds=req.duration_seconds,
     )
     return {"ok": True, "job_id": req.job_id}

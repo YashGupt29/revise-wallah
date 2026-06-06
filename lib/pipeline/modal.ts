@@ -1,20 +1,21 @@
 /**
- * ModalClient — responsible for triggering Modal pipeline functions.
+ * ModalClient — triggers Modal pipeline with pre-fetched transcript.
  *
- * Single responsibility: knows how to call the Modal web endpoint.
- * All business logic lives in the API route, not here.
+ * Modal only runs LLM generation — no YouTube access needed from cloud IPs.
  */
 
 const MODAL_TRIGGER_URL = "https://yashnitagartala8--revise-wallah-pipeline-trigger.modal.run";
-
-// Modal cold starts can take 30-60s — we fire-and-forget with a generous timeout.
-// The pipeline updates Supabase directly; we don't need to wait for it to finish.
-const TRIGGER_TIMEOUT_MS = 60_000;
+const TRIGGER_TIMEOUT_MS = 30_000;
 
 export async function triggerPipeline(params: {
   jobId: string;
   youtubeUrl: string;
   urlHash: string;
+  transcript: string;
+  language: string;
+  title: string;
+  channelName: string;
+  durationSeconds: number;
 }): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TRIGGER_TIMEOUT_MS);
@@ -27,6 +28,11 @@ export async function triggerPipeline(params: {
         job_id: params.jobId,
         youtube_url: params.youtubeUrl,
         url_hash: params.urlHash,
+        transcript: params.transcript,
+        language: params.language,
+        title: params.title,
+        channel_name: params.channelName,
+        duration_seconds: params.durationSeconds,
       }),
       signal: controller.signal,
     });

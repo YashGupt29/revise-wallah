@@ -1,13 +1,14 @@
 /**
  * POST /api/videos/submit
  *
- * Responsibilities (single route, clear flow):
- *  1. Validate the YouTube URL
- *  2. Check cache — return instantly if already processed
- *  3. Assert user has enough minutes
- *  4. Create an async job record
- *  5. Trigger Modal pipeline (fire-and-forget)
- *  6. Return job_id to the client for Realtime polling
+ * Flow:
+ *  1. Validate URL
+ *  2. Check cache
+ *  3. Assert minutes
+ *  4. Fetch transcript + metadata (from Next.js — not blocked by YouTube)
+ *  5. Create job record
+ *  6. Trigger Modal with transcript (Modal only runs LLM — no YouTube access)
+ *  7. Return job_id
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -17,11 +18,11 @@ import { normalizeYouTubeUrl, hashUrl, isYouTubeUrl } from "@/lib/url";
 import { checkCache } from "@/lib/pipeline/cache";
 import { assertSufficientMinutes, deductMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
 import { triggerPipeline } from "@/lib/pipeline/modal";
-import { calculateMinutesCost } from "@/lib/jobs/types";
+import { fetchTranscript } from "@/lib/pipeline/transcript";
 import { track } from "@/lib/mixpanel";
 
-const CACHE_HIT_COST = 5;   // minutes charged on cache hit
-const DEFAULT_MISS_COST = 10; // charged upfront; adjusted after duration known
+const CACHE_HIT_COST = 5;
+const DEFAULT_MISS_COST = 10;
 
 export async function POST(req: NextRequest) {
   // ── Auth ─────────────────────────────────────────────────────────────────
@@ -61,19 +62,13 @@ export async function POST(req: NextRequest) {
       throw err;
     }
 
-    // Link to user's library
     const admin = createAdminClient();
     await admin.from("user_notes").upsert(
       { user_id: user.id, processed_video_id: cached.processed_video_id },
       { onConflict: "user_id,processed_video_id" }
     );
 
-    const newBalance = await deductMinutes(
-      user.id,
-      CACHE_HIT_COST,
-      "cache_hit",
-      cached.processed_video_id
-    );
+    const newBalance = await deductMinutes(user.id, CACHE_HIT_COST, "cache_hit", cached.processed_video_id);
 
     track("study_kit_generated", {
       cache_hit: true,
@@ -91,7 +86,22 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // ── Cache miss — assert minutes and create job ────────────────────────────
+  // ── Fetch transcript from Next.js (not blocked by YouTube) ────────────────
+  let transcript: string;
+  let language: string;
+
+  try {
+    const result = await fetchTranscript(normalizedUrl);
+    transcript = result.text;
+    language = result.language;
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Could not fetch captions for this video. Please try a video with subtitles enabled." },
+      { status: 422 }
+    );
+  }
+
+  // ── Assert minutes ────────────────────────────────────────────────────────
   try {
     await assertSufficientMinutes(user.id, DEFAULT_MISS_COST);
   } catch (err) {
@@ -104,7 +114,20 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
-  // Create a stub in processed_videos so we can upsert later
+  // ── Get video metadata via oEmbed ─────────────────────────────────────────
+  let title = "";
+  let channelName = "";
+  try {
+    const oembed = await fetch(
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(normalizedUrl)}&format=json`
+    ).then((r) => r.json());
+    title = oembed.title ?? "";
+    channelName = oembed.author_name ?? "";
+  } catch {
+    // metadata is non-critical
+  }
+
+  // ── Create job ────────────────────────────────────────────────────────────
   const admin = createAdminClient();
   await admin.from("processed_videos").upsert(
     { url_hash: urlHash, youtube_url: normalizedUrl, status: "pending" },
@@ -127,10 +150,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  // ── Trigger Modal (true fire-and-forget — don't await) ───────────────────
-  // Modal cold starts can take 30-60s. We return 202 immediately and let
-  // Modal update the job status via Supabase directly.
-  triggerPipeline({ jobId: job.id, youtubeUrl: normalizedUrl, urlHash }).catch(async (err) => {
+  // ── Trigger Modal (fire-and-forget — transcript already fetched) ──────────
+  triggerPipeline({
+    jobId: job.id,
+    youtubeUrl: normalizedUrl,
+    urlHash,
+    transcript,
+    language,
+    title,
+    channelName,
+    durationSeconds: Math.round(transcript.split(" ").length / 2.5), // ~150wpm estimate
+  }).catch(async (err) => {
     await admin
       .from("jobs")
       .update({ status: "failed", error_message: String(err) })
