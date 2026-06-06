@@ -5,35 +5,22 @@
  * All business logic lives in the API route, not here.
  */
 
-const MODAL_API_BASE = "https://api.modal.com/v1";
+const MODAL_TRIGGER_URL = "https://yashnitagartala8--revise-wallah-pipeline-trigger.modal.run";
 
 export async function triggerPipeline(params: {
   jobId: string;
   youtubeUrl: string;
   urlHash: string;
 }): Promise<void> {
-  const tokenId = process.env.MODAL_TOKEN_ID!;
-  const tokenSecret = process.env.MODAL_TOKEN_SECRET!;
-  const credentials = Buffer.from(`${tokenId}:${tokenSecret}`).toString("base64");
-
-  const response = await fetch(
-    `${MODAL_API_BASE}/apps/revise-wallah-pipeline/functions/run_pipeline/invoke`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        args: [],
-        kwargs: {
-          job_id: params.jobId,
-          youtube_url: params.youtubeUrl,
-          url_hash: params.urlHash,
-        },
-      }),
-    }
-  );
+  const response = await fetch(MODAL_TRIGGER_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      job_id: params.jobId,
+      youtube_url: params.youtubeUrl,
+      url_hash: params.urlHash,
+    }),
+  });
 
   if (!response.ok) {
     const body = await response.text();
