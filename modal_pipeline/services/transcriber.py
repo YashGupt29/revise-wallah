@@ -20,20 +20,19 @@ def transcribe(audio_path: str) -> tuple[str, str]:
     from faster_whisper import WhisperModel
 
     model = WhisperModel(
-        "large-v3",
-        device="cuda",
-        compute_type="float16",
+        "base",
+        device="cpu",
+        compute_type="int8",
     )
 
     segments, info = model.transcribe(
         audio_path,
-        beam_size=5,
-        temperature=0.0,       # deterministic — required for cache correctness
-        language=None,         # auto-detect: handles Hindi, English, Hinglish
-        vad_filter=True,       # skip silence segments
-        vad_parameters={
-            "min_silence_duration_ms": 500,
-        },
+        beam_size=3,
+        temperature=0.0,
+        language=None,
+        vad_filter=True,
+        condition_on_previous_text=False,
+        vad_parameters={"min_silence_duration_ms": 500},
     )
 
     transcript = " ".join(seg.text.strip() for seg in segments)

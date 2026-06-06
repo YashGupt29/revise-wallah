@@ -67,8 +67,9 @@ def _update_job(job_id: str, status: str, step: str, progress: int, error: str =
 # ─── Main orchestrator ────────────────────────────────────────────────────────
 
 @app.function(
-    gpu="T4",
-    timeout=600,          # 10 min max — handles 2hr lectures
+    cpu=2,
+    memory=4096,
+    timeout=600,
     secrets=[pipeline_secrets],
     retries=modal.Retries(max_retries=1, backoff_coefficient=1.0),
 )
