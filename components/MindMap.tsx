@@ -21,15 +21,16 @@ interface Props {
   notes: NotesJson;
 }
 
-const CX = 450;
-const CY = 420;
+const CX = 480;
+const CY = 450;
 const SECTION_RADIUS = 220;
-const BULLET_RADIUS = 155;
+const BULLET_RADIUS = 165;
 const MAX_BULLETS = 2;
-const TRUNCATE_LEN = 40;
 
-function truncate(text: string, len: number = TRUNCATE_LEN): string {
-  return text.length > len ? text.slice(0, len - 1) + "…" : text;
+function truncate(text: string, len: number): string {
+  if (text.length <= len) return text;
+  const cut = text.lastIndexOf(" ", len);
+  return (cut > 10 ? text.slice(0, cut) : text.slice(0, len)) + "…";
 }
 
 // Compute (x, y) from center at angle (radians) and distance
@@ -185,11 +186,11 @@ export default function MindMap({ title, notes }: Props) {
           key={`bullet-${si}-${bi}`}
           x={bx}
           y={by}
-          text={truncate(bullet, 38)}
+          text={truncate(bullet, 70)}
           fill="#f3f4f6"
           textColor="#374151"
-          width={120}
-          height={50}
+          width={155}
+          height={76}
           rx={8}
           fontSize={10}
         />
@@ -197,16 +198,16 @@ export default function MindMap({ title, notes }: Props) {
     });
 
     // Section node (rendered after bullets so it sits on top of its lines)
-    nodes.push(
+      nodes.push(
       <NodeBox
         key={`section-${si}`}
         x={sx}
         y={sy}
-        text={truncate(section.heading, 36)}
+        text={truncate(section.heading, 48)}
         fill="#4f46e5"
         textColor="#ffffff"
-        width={130}
-        height={52}
+        width={148}
+        height={62}
         rx={10}
         fontSize={11}
         fontWeight="600"
@@ -220,11 +221,11 @@ export default function MindMap({ title, notes }: Props) {
       key="center"
       x={CX}
       y={CY}
-      text={truncate(title, 42)}
+      text={truncate(title, 55)}
       fill="#7c3aed"
       textColor="#ffffff"
-      width={150}
-      height={60}
+      width={170}
+      height={74}
       rx={14}
       fontSize={13}
       fontWeight="700"
@@ -233,7 +234,7 @@ export default function MindMap({ title, notes }: Props) {
 
   return (
     <svg
-      viewBox="0 0 900 840"
+      viewBox="0 0 960 900"
       width="100%"
       aria-label="Mind map"
       style={{ display: "block", background: "#ffffff" }}
