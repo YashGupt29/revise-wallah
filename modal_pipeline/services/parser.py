@@ -14,11 +14,20 @@ def to_structured_markdown(content: GeneratedContent) -> str:
     lines: list[str] = []
 
     lines.append(f"# {content.title}")
-    lines.append(f"> **Subject:** {content.subject} | **Topic:** {content.topic}")
+    subtopic_part = f" › {content.subtopic}" if content.subtopic else ""
+    lines.append(f"> **Subject:** {content.subject} | **Topic:** {content.topic}{subtopic_part}")
+    lines.append("")
+    lines.append(f"> **Difficulty:** {content.difficulty_level} | **Language:** {content.language}")
     lines.append("")
     lines.append("## Summary")
     lines.append(content.notes.summary)
     lines.append("")
+
+    if content.notes.key_takeaways:
+        lines.append("## Key Takeaways")
+        for kt in content.notes.key_takeaways:
+            lines.append(f"- {kt}")
+        lines.append("")
 
     for section in content.notes.sections:
         lines.append(f"## {section.heading}")
@@ -38,6 +47,18 @@ def to_structured_markdown(content: GeneratedContent) -> str:
             lines.append("**Key Definitions:**")
             for defn in section.definitions:
                 lines.append(f"- {defn}")
+
+        if section.examples:
+            lines.append("")
+            lines.append("**Examples:**")
+            for ex in section.examples:
+                lines.append(f"- {ex}")
+
+        if section.exam_tips:
+            lines.append("")
+            lines.append("**Exam Tips:**")
+            for tip in section.exam_tips:
+                lines.append(f"> {tip}")
 
         lines.append("")
 
@@ -103,7 +124,16 @@ def to_handwritten_html(content: GeneratedContent) -> str:
 
 def to_flashcards(content: GeneratedContent) -> list[dict]:
     """Convert GeneratedContent → list of flashcard dicts."""
-    return [{"question": fc.question, "answer": fc.answer} for fc in content.flashcards]
+    return [
+        {
+            "question": fc.question,
+            "answer": fc.answer,
+            "concept": fc.concept,
+            "difficulty": fc.difficulty,
+            "exam_tags": fc.exam_tags,
+        }
+        for fc in content.flashcards
+    ]
 
 
 def to_quiz(content: GeneratedContent) -> list[dict]:
@@ -115,6 +145,9 @@ def to_quiz(content: GeneratedContent) -> list[dict]:
             "correct": q.correct,
             "concept": q.concept,
             "explanation": q.explanation,
+            "difficulty": q.difficulty,
+            "exam_tags": q.exam_tags,
+            "marks": q.marks,
         }
         for q in content.quiz
     ]
@@ -127,7 +160,9 @@ def to_concepts(content: GeneratedContent) -> list[dict]:
             "name": c.name,
             "description": c.description,
             "exam_tags": c.exam_tags,
+            "importance": c.importance,
             "timestamp_approx": c.timestamp_approx,
+            "prerequisites": c.prerequisites,
         }
         for c in content.concepts
     ]
@@ -140,6 +175,7 @@ def to_concept_relationships(content: GeneratedContent) -> list[dict]:
             "from_concept": r.from_concept,
             "to_concept": r.to_concept,
             "type": r.type,
+            "explanation": r.explanation,
         }
         for r in content.concept_relationships
     ]
