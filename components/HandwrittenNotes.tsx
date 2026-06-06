@@ -1,8 +1,8 @@
 "use client";
 
-import { Caveat } from "next/font/google";
+import { Kalam } from "next/font/google";
 
-const caveat = Caveat({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const kalam = Kalam({ subsets: ["latin"], weight: ["300", "400", "700"] });
 
 // ---------------------------------------------------------------------------
 // Types
@@ -273,7 +273,7 @@ export default function HandwrittenNotes({
 
       {/* Outer wrapper: slight whole-page tilt */}
       <div
-        className={caveat.className}
+        className={kalam.className}
         style={{ transform: "rotate(-0.2deg)", transformOrigin: "top center" }}
       >
         {/* Paper */}
