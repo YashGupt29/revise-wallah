@@ -282,8 +282,7 @@ export default function HandwrittenNotes({
           style={{
             backgroundColor: "#fffef0",
             backgroundImage: `
-              linear-gradient(90deg, transparent 62px, #ffb3b3 62px, #ffb3b3 63px, transparent 63px),
-              repeating-linear-gradient(transparent, transparent 27px, #c8dff8 27px, #c8dff8 28px)
+              linear-gradient(90deg, transparent 62px, #ffb3b3 62px, #ffb3b3 63px, transparent 63px)
             `,
             minHeight: "100vh",
             padding: "40px 40px 80px 80px",
