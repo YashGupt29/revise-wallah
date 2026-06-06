@@ -426,9 +426,6 @@ export default function NotesClient({ video, isStarred }: Props) {
               {video.channel_name && (
                 <span className="text-sm text-gray-500">{video.channel_name}</span>
               )}
-              {video.duration_seconds && (
-                <span className="text-sm text-gray-400">{formatDuration(video.duration_seconds)}</span>
-              )}
               {video.language && (
                 <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full capitalize">
                   {video.language}
@@ -438,6 +435,12 @@ export default function NotesClient({ video, isStarred }: Props) {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {video.duration_seconds ? (
+              <div className="text-right">
+                <p className="text-xs text-gray-400 leading-none mb-0.5">Duration</p>
+                <p className="text-sm font-semibold text-gray-700">{formatDuration(video.duration_seconds)}</p>
+              </div>
+            ) : null}
             {video.youtube_url && (
               <a
                 href={video.youtube_url}

@@ -90,11 +90,13 @@ export async function POST(req: NextRequest) {
   // ── Fetch transcript from Next.js (not blocked by YouTube) ────────────────
   let transcript: string;
   let language: string;
+  let durationSeconds = 0;
 
   try {
     const result = await fetchTranscript(normalizedUrl);
     transcript = result.text;
     language = result.language;
+    durationSeconds = result.durationSeconds;
   } catch (err) {
     return NextResponse.json(
       { error: "Could not fetch captions for this video. Please try a video with subtitles enabled." },
@@ -174,7 +176,7 @@ export async function POST(req: NextRequest) {
     language,
     title,
     channelName,
-    durationSeconds: Math.round(transcript.split(" ").length / 2.5), // ~150wpm estimate
+    durationSeconds,
   }).catch(async (err) => {
     await admin
       .from("jobs")

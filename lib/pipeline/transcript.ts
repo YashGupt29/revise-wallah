@@ -10,10 +10,17 @@ import { YoutubeTranscript } from "youtube-transcript";
 export interface TranscriptResult {
   text: string;
   language: string;
+  durationSeconds: number;
 }
 
 // Priority order: English variants first, then Hindi, then any available
 const LANG_PRIORITY = ["en", "en-US", "en-GB", "en-IN", "hi", "hi-IN"];
+
+function calcDuration(entries: { offset: number; duration: number }[]): number {
+  if (!entries.length) return 0;
+  const last = entries[entries.length - 1];
+  return Math.round(last.offset + last.duration);
+}
 
 export async function fetchTranscript(youtubeUrl: string): Promise<TranscriptResult> {
   // Try preferred languages in priority order
@@ -22,7 +29,11 @@ export async function fetchTranscript(youtubeUrl: string): Promise<TranscriptRes
       const entries = await YoutubeTranscript.fetchTranscript(youtubeUrl, { lang });
       if (entries && entries.length > 0) {
         const text = entries.map((e) => e.text.trim()).filter(Boolean).join(" ");
-        return { text, language: lang.startsWith("hi") ? "hindi" : "english" };
+        return {
+          text,
+          language: lang.startsWith("hi") ? "hindi" : "english",
+          durationSeconds: calcDuration(entries),
+        };
       }
     } catch {
       // This language not available — try next
@@ -36,6 +47,6 @@ export async function fetchTranscript(youtubeUrl: string): Promise<TranscriptRes
   }
 
   const text = entries.map((e) => e.text.trim()).filter(Boolean).join(" ");
-  return { text, language: "auto" };
+  return { text, language: "auto", durationSeconds: calcDuration(entries) };
 }
 
