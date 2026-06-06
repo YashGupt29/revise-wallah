@@ -285,7 +285,6 @@ export default function HandwrittenNotes({
             backgroundImage: `
               linear-gradient(90deg, transparent 62px, #ffb3b3 62px, #ffb3b3 63px, transparent 63px)
             `,
-            minHeight: "100vh",
             padding: "40px 40px 80px 80px",
             maxWidth: "860px",
             margin: "auto",

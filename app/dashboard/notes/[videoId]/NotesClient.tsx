@@ -398,19 +398,68 @@ export default function NotesClient({ video, isStarred }: Props) {
   ];
 
   function exportPdf() {
-    const id = tab === "handwritten" ? "handwritten-paper" : "notes-print-content";
+    track("export_triggered", { tab, video_id: video.id });
+
+    if (tab === "handwritten") {
+      // New-window approach: outerHTML carries all inline styles,
+      // so nothing gets lost. Font is loaded fresh via CDN link.
+      const paper = document.getElementById("handwritten-paper");
+      if (!paper) return;
+
+      const html = paper.outerHTML;
+      const win = window.open("", "_blank");
+      if (!win) return;
+
+      win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Kalam', cursive; background: white; }
+    @media print {
+      @page { margin: 0.4in; size: A4; }
+      body { margin: 0; }
+      /* ensure backgrounds (paper gradient) print */
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+  </style>
+</head>
+<body>${html}</body>
+</html>`);
+      win.document.close();
+
+      // Wait for font to load before printing
+      win.onload = () => setTimeout(() => { win.focus(); win.print(); }, 600);
+      return;
+    }
+
+    // Notes / other tabs: visibility injection (content uses Tailwind already loaded)
+    const id = "notes-print-content";
     const style = document.createElement("style");
     style.innerHTML = `
       @media print {
+        @page { margin: 0.5in; }
         body * { visibility: hidden !important; }
-        #${id}, #${id} * { visibility: visible !important; }
-        #${id} { position: absolute; top: 0; left: 0; width: 100%; }
+        #${id}, #${id} * {
+          visibility: visible !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        #${id} {
+          position: absolute; top: 0; left: 0;
+          width: 100%; height: auto; min-height: auto;
+        }
       }
     `;
     document.head.appendChild(style);
-    track("export_triggered", { tab, video_id: video.id });
-    window.print();
-    document.head.removeChild(style);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => document.head.removeChild(style), 500);
+    }, 100);
   }
 
   async function toggleStar() {    const next = !starred;
