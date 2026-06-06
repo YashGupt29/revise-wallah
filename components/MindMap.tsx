@@ -22,8 +22,8 @@ interface Props {
 const CX = 480;
 const CY = 450;
 const SECTION_RADIUS = 220;
-const BULLET_RADIUS = 165;
-const MAX_BULLETS = 4;
+const BULLET_RADIUS = 175;
+const MAX_BULLETS = 3;
 
 // Compute (x, y) from center at angle (radians) and distance
 function polar(cx: number, cy: number, angle: number, r: number): [number, number] {
@@ -143,13 +143,17 @@ export default function MindMap({ data }: Props) {
       />
     );
 
-    // Children (leaves) — max 4
+    // Children (leaves) — max 3
     const children = (branch.children ?? []).slice(0, MAX_BULLETS);
     const childCount = children.length;
 
+    // Adaptive spread: cap at 55% of the inter-branch gap so leaves never
+    // collide with the neighbouring branch's leaves
+    const interBranchGap = (2 * Math.PI) / branchCount;
+    const maxSpread = Math.min(Math.PI * 65 / 180, interBranchGap * 0.5);
+
     children.forEach((child, bi) => {
-      // Spread leaves in an 80° arc centered on the branch angle
-      const spread = childCount > 1 ? (Math.PI * 80 / 180) : 0;
+      const spread = childCount > 1 ? maxSpread : 0;
       const startAngle = angle - spread / 2;
       const leafAngle = childCount > 1
         ? startAngle + (spread / (childCount - 1)) * bi
