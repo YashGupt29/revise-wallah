@@ -127,21 +127,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  // ── Trigger Modal (fire-and-forget) ───────────────────────────────────────
-  try {
-    await triggerPipeline({ jobId: job.id, youtubeUrl: normalizedUrl, urlHash });
-  } catch (err) {
-    // Mark job as failed immediately if Modal trigger fails
+  // ── Trigger Modal (true fire-and-forget — don't await) ───────────────────
+  // Modal cold starts can take 30-60s. We return 202 immediately and let
+  // Modal update the job status via Supabase directly.
+  triggerPipeline({ jobId: job.id, youtubeUrl: normalizedUrl, urlHash }).catch(async (err) => {
     await admin
       .from("jobs")
       .update({ status: "failed", error_message: String(err) })
       .eq("id", job.id);
-
-    return NextResponse.json(
-      { error: "Failed to start pipeline. Try again." },
-      { status: 500 }
-    );
-  }
+  });
 
   track("pipeline_started", { job_id: job.id, url_hash: urlHash });
 
