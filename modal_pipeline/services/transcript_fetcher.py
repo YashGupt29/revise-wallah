@@ -1,11 +1,8 @@
 """
 TranscriptFetcher — fetches transcript from YouTube's caption API.
 
-Single responsibility: given a YouTube URL, return the transcript text.
-Uses youtube-transcript-api which fetches captions directly — no audio
-download, no bot detection issues, much faster than Whisper on cloud IPs.
-
-Falls back to manual captions → auto-generated → any available language.
+Uses youtube-transcript-api 0.5.0 which fetches captions directly.
+No audio download, no bot detection issues, much faster than Whisper.
 """
 
 import re
@@ -35,26 +32,29 @@ def fetch_transcript(youtube_url: str) -> tuple[str, str]:
 
     video_id = _extract_video_id(youtube_url)
 
-    # Try Hindi first, then English, then anything available
-    for languages in (["hi"], ["en"], None):
+    # Try Hindi, then English, then any available language
+    for languages, lang_label in [
+        (["hi"], "hindi"),
+        (["en"], "english"),
+        (None, "hinglish"),
+    ]:
         try:
             if languages:
-                transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+                entries = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
             else:
-                # Fetch whatever is available
                 transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
                 transcript = next(iter(transcript_list))
-                transcript_data = transcript.fetch()
+                entries = transcript.fetch()
 
             text = " ".join(
-                entry.get("text", "").strip()
-                for entry in transcript_data
-                if entry.get("text", "").strip()
+                e["text"].strip() for e in entries if e.get("text", "").strip()
             )
             if text:
-                lang = "hindi" if languages == ["hi"] else "english" if languages == ["en"] else "hinglish"
-                return text, lang
+                return text, lang_label
         except Exception:
             continue
 
-    raise ValueError("No captions available for this video. Try a video with subtitles enabled.")
+    raise ValueError(
+        "No captions available for this video. "
+        "Please try a video that has subtitles/captions enabled."
+    )

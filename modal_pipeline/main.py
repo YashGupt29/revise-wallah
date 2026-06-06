@@ -31,7 +31,7 @@ from modal_pipeline.services import parser
 pipeline_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install(
-        "youtube-transcript-api==0.6.2",
+        "youtube-transcript-api==0.5.0",
         "yt-dlp==2024.12.13",
         "faster-whisper==1.1.0",
         "google-genai>=1.0.0",
