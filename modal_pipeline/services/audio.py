@@ -25,18 +25,19 @@ def extract_audio(youtube_url: str, output_dir: str) -> tuple[str, dict]:
     output_template = os.path.join(output_dir, "%(id)s.%(ext)s")
 
     ydl_opts = {
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
         "outtmpl": output_template,
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
-                "preferredquality": "128",  # 128kbps sufficient for speech
+                "preferredquality": "128",
             }
         ],
         "quiet": True,
         "no_warnings": True,
-        "noplaylist": True,  # never download a full playlist
+        "noplaylist": True,
+        "extractor_args": {"youtube": {"skip": ["dash", "hls"]}},
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
