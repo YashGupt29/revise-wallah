@@ -401,7 +401,7 @@ export default function NotesClient({ video, isStarred }: Props) {
     track("export_triggered", { tab, video_id: video.id });
 
     if (tab === "handwritten") {
-      window.open(`/dashboard/notes/${video.id}/print`, "_blank");
+      window.open(`/print/notes/${video.id}`, "_blank");
       return;
     }
 
