@@ -54,15 +54,19 @@ pipeline_secrets = modal.Secret.from_name("revise-wallah-secrets")
 # ─── Job status helper ────────────────────────────────────────────────────────
 
 def _fetch_metadata(youtube_url: str) -> dict:
-    """Fetch video metadata without downloading audio."""
-    import yt_dlp
-    ydl_opts = {"quiet": True, "no_warnings": True, "skip_download": True}
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(youtube_url, download=False)
+    """Fetch video metadata using YouTube oEmbed API — no auth, no bot detection."""
+    import urllib.request
+    import urllib.parse
+    import json
+
+    oembed_url = "https://www.youtube.com/oembed?url=" + urllib.parse.quote(youtube_url) + "&format=json"
+    with urllib.request.urlopen(oembed_url, timeout=10) as resp:
+        data = json.loads(resp.read())
+
     return {
-        "title": info.get("title", ""),
-        "channel_name": info.get("uploader", ""),
-        "duration_seconds": int(info.get("duration", 0)),
+        "title": data.get("title", ""),
+        "channel_name": data.get("author_name", ""),
+        "duration_seconds": 0,  # oEmbed doesn't provide duration; updated after transcription
     }
 
 
