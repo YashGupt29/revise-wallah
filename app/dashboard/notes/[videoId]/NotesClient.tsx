@@ -382,7 +382,9 @@ export default function NotesClient({ video, isStarred }: Props) {
   const [tab, setTab] = useState<Tab>("notes");
   const [starred, setStarred] = useState(isStarred);
 
-  const notes = video.notes_json;
+  // notes_json stores the full GeneratedContent object; the notes sub-key holds summary/sections
+  const rawJson = video.notes_json as (NotesJson & { notes?: NotesJson }) | null;
+  const notes: NotesJson | null = rawJson?.notes ?? rawJson ?? null;
   const flashcards = video.flashcards_json ?? [];
   const quiz = video.quiz_json ?? [];
 
