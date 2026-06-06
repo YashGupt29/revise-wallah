@@ -17,6 +17,8 @@ import tempfile
 
 import modal
 
+from pydantic import BaseModel
+
 from modal_pipeline.utils.url import normalize_youtube_url, hash_url
 from modal_pipeline.utils.supabase_client import get_supabase
 from modal_pipeline.services.audio import extract_audio
@@ -194,3 +196,26 @@ def _store_concepts(sb, processed_video_id: str, concepts: list[dict], relations
                 ).execute()
     except Exception:
         pass  # graph seeds are non-critical — don't fail the job
+
+
+# ─── Web endpoint — called by Next.js API ────────────────────────────────────
+
+class TriggerRequest(BaseModel):
+    job_id: str
+    youtube_url: str
+    url_hash: str
+
+
+@app.function(secrets=[pipeline_secrets])
+@modal.fastapi_endpoint(method="POST")
+def trigger(req: TriggerRequest):
+    """
+    HTTP entry point for the Next.js API.
+    Spawns run_pipeline asynchronously and returns immediately.
+    """
+    run_pipeline.spawn(
+        job_id=req.job_id,
+        youtube_url=req.youtube_url,
+        url_hash=req.url_hash,
+    )
+    return {"ok": True, "job_id": req.job_id}
