@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { track } from "@/lib/mixpanel";
-import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink } from "lucide-react";
+import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink, PenLine } from "lucide-react";
+import HandwrittenNotes from "@/components/HandwrittenNotes";
 import clsx from "clsx";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ interface Props {
   isStarred: boolean;
 }
 
-type Tab = "notes" | "flashcards" | "quiz";
+type Tab = "notes" | "flashcards" | "quiz" | "handwritten";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -385,6 +386,7 @@ export default function NotesClient({ video, isStarred }: Props) {
   // notes_json stores the full GeneratedContent object; the notes sub-key holds summary/sections
   const rawJson = video.notes_json as (NotesJson & { notes?: NotesJson }) | null;
   const notes: NotesJson | null = rawJson?.notes ?? rawJson ?? null;
+  const generatedContent = rawJson as any;
   const flashcards = video.flashcards_json ?? [];
   const quiz = video.quiz_json ?? [];
 
@@ -392,6 +394,7 @@ export default function NotesClient({ video, isStarred }: Props) {
     { id: "notes", label: "Notes", icon: <BookOpen className="w-4 h-4" /> },
     { id: "flashcards", label: "Flashcards", icon: <Zap className="w-4 h-4" />, count: flashcards.length },
     { id: "quiz", label: "Quiz", icon: <HelpCircle className="w-4 h-4" />, count: quiz.length },
+    { id: "handwritten", label: "Handwritten", icon: <PenLine className="w-4 h-4" /> },
   ];
 
   async function toggleStar() {
@@ -512,6 +515,18 @@ export default function NotesClient({ video, isStarred }: Props) {
       {tab === "quiz" && quiz.length > 0 && <QuizTab questions={quiz} />}
       {tab === "quiz" && quiz.length === 0 && (
         <div className="text-center py-20 text-gray-400">No quiz questions generated for this video.</div>
+      )}
+
+      {tab === "handwritten" && generatedContent?.notes && (
+        <HandwrittenNotes
+          content={generatedContent}
+          videoTitle={video.title}
+          channelName={video.channel_name}
+          durationSeconds={video.duration_seconds}
+        />
+      )}
+      {tab === "handwritten" && !generatedContent?.notes && (
+        <div className="text-center py-20 text-gray-400">Handwritten notes not available.</div>
       )}
     </div>
   );
