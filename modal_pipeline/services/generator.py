@@ -45,7 +45,7 @@ def generate_notes(transcript: str) -> GeneratedContent:
     for attempt in range(_MAX_RETRIES):
         try:
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash",
                 contents=user_prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt,
