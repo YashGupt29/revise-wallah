@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { track } from "@/lib/mixpanel";
-import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink, PenLine, Download, Network } from "lucide-react";
+import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink, PenLine, Download, Network, FileText } from "lucide-react";
 import HandwrittenNotes from "@/components/HandwrittenNotes";
 import MindMap from "@/components/MindMap";
+import ShortNotes from "@/components/ShortNotes";
 import clsx from "clsx";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -44,6 +45,18 @@ interface QuizQuestion {
   marks?: number;
 }
 
+interface ShortNoteSection {
+  heading: string;
+  formulas?: string[];
+  key_concepts?: string[];
+  definitions?: string[];
+  must_remember?: string[];
+}
+
+interface ShortNotesData {
+  sections: ShortNoteSection[];
+}
+
 interface Video {
   id: string;
   title?: string;
@@ -55,6 +68,7 @@ interface Video {
   notes_structured?: string | null;
   flashcards_json?: Flashcard[] | null;
   quiz_json?: QuizQuestion[] | null;
+  short_notes_json?: ShortNotesData | null;
 }
 
 interface Props {
@@ -62,7 +76,7 @@ interface Props {
   isStarred: boolean;
 }
 
-type Tab = "notes" | "flashcards" | "quiz" | "handwritten" | "mindmap";
+type Tab = "notes" | "flashcards" | "quiz" | "handwritten" | "mindmap" | "shortnotes";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -388,6 +402,7 @@ export default function NotesClient({ video, isStarred }: Props) {
   const rawJson = video.notes_json as (NotesJson & { notes?: NotesJson }) | null;
   const notes: NotesJson | null = rawJson?.notes ?? rawJson ?? null;
   const generatedContent = rawJson as any;
+  const mindMapData = (rawJson as any)?.mind_map ?? null;
   const flashcards = video.flashcards_json ?? [];
   const quiz = video.quiz_json ?? [];
 
@@ -397,6 +412,7 @@ export default function NotesClient({ video, isStarred }: Props) {
     { id: "quiz", label: "Quiz", icon: <HelpCircle className="w-4 h-4" />, count: quiz.length },
     { id: "handwritten", label: "Handwritten", icon: <PenLine className="w-4 h-4" /> },
     { id: "mindmap", label: "Mind Map", icon: <Network className="w-4 h-4" /> },
+    { id: "shortnotes", label: "Short Notes", icon: <FileText className="w-4 h-4" /> },
   ];
 
   function exportPdf() {
@@ -578,13 +594,24 @@ export default function NotesClient({ video, isStarred }: Props) {
         <div className="text-center py-20 text-gray-400">Handwritten notes not available.</div>
       )}
 
-      {tab === "mindmap" && notes && (
+      {tab === "mindmap" && mindMapData && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-          <MindMap title={video.title ?? "Mind Map"} notes={notes} />
+          <MindMap data={mindMapData} />
         </div>
       )}
-      {tab === "mindmap" && !notes && (
-        <div className="text-center py-20 text-gray-400">No notes available to display as a mind map.</div>
+      {tab === "mindmap" && !mindMapData && (
+        <div className="text-center py-20 text-gray-400">No mind map data available for this video.</div>
+      )}
+
+      {tab === "shortnotes" && (
+        video.short_notes_json ? (
+          <ShortNotes data={video.short_notes_json as any} />
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-gray-400 text-sm">Short notes not yet generated for this video.</p>
+            <p className="text-xs text-gray-300 mt-1">Re-submit the video URL to generate short notes.</p>
+          </div>
+        )
       )}
     </div>
   );

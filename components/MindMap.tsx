@@ -1,37 +1,29 @@
 "use client";
 
-interface NoteSection {
-  heading: string;
-  order?: number;
-  bullets?: string[];
-  formulas?: string[];
-  definitions?: string[];
-  examples?: string[];
-  exam_tips?: string[];
+interface MindMapChild {
+  label: string;
+  leaf?: boolean;
 }
 
-interface NotesJson {
-  summary?: string;
-  key_takeaways?: string[];
-  sections?: NoteSection[];
+interface MindMapBranch {
+  label: string;
+  children: MindMapChild[];
+}
+
+interface MindMapData {
+  root: string;
+  branches: MindMapBranch[];
 }
 
 interface Props {
-  title: string;
-  notes: NotesJson;
+  data: MindMapData;
 }
 
 const CX = 480;
 const CY = 450;
 const SECTION_RADIUS = 220;
 const BULLET_RADIUS = 165;
-const MAX_BULLETS = 2;
-
-function truncate(text: string, len: number): string {
-  if (text.length <= len) return text;
-  const cut = text.lastIndexOf(" ", len);
-  return (cut > 10 ? text.slice(0, cut) : text.slice(0, len)) + "…";
-}
+const MAX_BULLETS = 4;
 
 // Compute (x, y) from center at angle (radians) and distance
 function polar(cx: number, cy: number, angle: number, r: number): [number, number] {
@@ -70,7 +62,6 @@ function NodeBox({
   fontSize = 12,
   fontWeight = "normal",
 }: NodeBoxProps) {
-  // foreignObject for text wrapping
   const fo = (
     <foreignObject
       x={x - width / 2}
@@ -118,30 +109,29 @@ function NodeBox({
   );
 }
 
-export default function MindMap({ title, notes }: Props) {
-  const sections = notes.sections ?? [];
-  const sectionCount = sections.length;
-
-  if (sectionCount === 0) {
+export default function MindMap({ data }: Props) {
+  if (!data || !data.branches || data.branches.length === 0) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
-        No sections available to display as a mind map.
+        No mind map data available.
       </div>
     );
   }
 
-  // Precompute all positions
-  const sectionAngles = sections.map((_, i) => (2 * Math.PI * i) / sectionCount - Math.PI / 2);
+  const branches = data.branches;
+  const branchCount = branches.length;
 
-  // Collect all SVG elements to render in defined order (lines first, nodes on top)
+  // Precompute branch angles spread evenly around the circle
+  const branchAngles = branches.map((_, i) => (2 * Math.PI * i) / branchCount - Math.PI / 2);
+
   const lines: React.ReactNode[] = [];
   const nodes: React.ReactNode[] = [];
 
-  sections.forEach((section, si) => {
-    const angle = sectionAngles[si];
+  branches.forEach((branch, si) => {
+    const angle = branchAngles[si];
     const [sx, sy] = polar(CX, CY, angle, SECTION_RADIUS);
 
-    // Line: center → section
+    // Line: center → branch
     lines.push(
       <path
         key={`line-center-${si}`}
@@ -153,24 +143,24 @@ export default function MindMap({ title, notes }: Props) {
       />
     );
 
-    // Bullets
-    const bullets = (section.bullets ?? []).slice(0, MAX_BULLETS);
-    const bulletCount = bullets.length;
+    // Children (leaves) — max 4
+    const children = (branch.children ?? []).slice(0, MAX_BULLETS);
+    const childCount = children.length;
 
-    bullets.forEach((bullet, bi) => {
-      // Spread bullets in a 60° arc centered on the section angle (outward from center)
-      const spread = bulletCount > 1 ? (Math.PI * 80 / 180) : 0; // 80° arc
+    children.forEach((child, bi) => {
+      // Spread leaves in an 80° arc centered on the branch angle
+      const spread = childCount > 1 ? (Math.PI * 80 / 180) : 0;
       const startAngle = angle - spread / 2;
-      const bulletAngle = bulletCount > 1
-        ? startAngle + (spread / (bulletCount - 1)) * bi
+      const leafAngle = childCount > 1
+        ? startAngle + (spread / (childCount - 1)) * bi
         : angle;
 
-      const [bx, by] = polar(sx, sy, bulletAngle, BULLET_RADIUS);
+      const [bx, by] = polar(sx, sy, leafAngle, BULLET_RADIUS);
 
-      // Line: section → bullet
+      // Line: branch → leaf
       lines.push(
         <path
-          key={`line-bullet-${si}-${bi}`}
+          key={`line-leaf-${si}-${bi}`}
           d={bezierPath(sx, sy, bx, by)}
           stroke="#6b7280"
           strokeWidth={1.5}
@@ -180,13 +170,13 @@ export default function MindMap({ title, notes }: Props) {
         />
       );
 
-      // Bullet node
+      // Leaf node
       nodes.push(
         <NodeBox
-          key={`bullet-${si}-${bi}`}
+          key={`leaf-${si}-${bi}`}
           x={bx}
           y={by}
-          text={truncate(bullet, 70)}
+          text={child.label}
           fill="#f3f4f6"
           textColor="#374151"
           width={155}
@@ -197,13 +187,13 @@ export default function MindMap({ title, notes }: Props) {
       );
     });
 
-    // Section node (rendered after bullets so it sits on top of its lines)
-      nodes.push(
+    // Branch node (rendered after leaves so it sits on top)
+    nodes.push(
       <NodeBox
-        key={`section-${si}`}
+        key={`branch-${si}`}
         x={sx}
         y={sy}
-        text={truncate(section.heading, 48)}
+        text={branch.label}
         fill="#4f46e5"
         textColor="#ffffff"
         width={148}
@@ -221,7 +211,7 @@ export default function MindMap({ title, notes }: Props) {
       key="center"
       x={CX}
       y={CY}
-      text={truncate(title, 55)}
+      text={data.root}
       fill="#7c3aed"
       textColor="#ffffff"
       width={170}

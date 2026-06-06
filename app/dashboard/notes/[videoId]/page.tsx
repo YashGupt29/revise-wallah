@@ -26,7 +26,7 @@ export default async function NotesPage({ params }: Props) {
   const { data: video } = await supabase
     .from("processed_videos")
     .select(
-      "id, title, channel_name, duration_seconds, language, notes_json, notes_structured, flashcards_json, quiz_json, youtube_url"
+      "id, title, channel_name, duration_seconds, language, notes_json, notes_structured, flashcards_json, quiz_json, youtube_url, short_notes_json"
     )
     .eq("id", videoId)
     .eq("status", "done")
