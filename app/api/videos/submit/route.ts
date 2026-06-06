@@ -129,10 +129,24 @@ export async function POST(req: NextRequest) {
 
   // ── Create job ────────────────────────────────────────────────────────────
   const admin = createAdminClient();
-  await admin.from("processed_videos").upsert(
-    { url_hash: urlHash, youtube_url: normalizedUrl, status: "pending" },
-    { onConflict: "url_hash" }
-  );
+  const { data: processedVideo } = await admin
+    .from("processed_videos")
+    .upsert(
+      { url_hash: urlHash, youtube_url: normalizedUrl, status: "pending" },
+      { onConflict: "url_hash" }
+    )
+    .select("id")
+    .single();
+
+  // Pre-create user_notes so the notes page works as soon as the job completes
+  if (processedVideo?.id) {
+    await admin
+      .from("user_notes")
+      .upsert(
+        { user_id: user.id, processed_video_id: processedVideo.id },
+        { onConflict: "user_id,processed_video_id" }
+      );
+  }
 
   const { data: job, error: jobError } = await admin
     .from("jobs")
