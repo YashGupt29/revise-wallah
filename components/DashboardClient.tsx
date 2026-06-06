@@ -40,13 +40,12 @@ export default function DashboardClient({ initialNotes }: Props) {
   }
 
   function handleCacheHit(videoId: string, title: string) {
-    // Instantly show in library — optimistic update
-    router.refresh();
+    router.push(`/dashboard/notes/${videoId}`);
   }
 
   function handleJobComplete(videoId: string) {
     setActiveJobId(null);
-    router.refresh();
+    router.push(`/dashboard/notes/${videoId}`);
   }
 
   function handleJobDismiss() {
