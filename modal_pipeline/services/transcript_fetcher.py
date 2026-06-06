@@ -35,16 +35,26 @@ def fetch_transcript(youtube_url: str) -> tuple[str, str]:
 
     video_id = _extract_video_id(youtube_url)
 
-    # Try preferred languages first, then fall back to any available
-    try:
-        transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=["hi", "en"])
-        language = "hindi" if transcript_data[0].get("language_code", "en") == "hi" else "english"
-    except Exception:
+    # Try Hindi first, then English, then anything available
+    for languages in (["hi"], ["en"], None):
         try:
-            transcript_data = YouTubeTranscriptApi.get_transcript(video_id)
-            language = "hinglish"
-        except Exception as e:
-            raise ValueError(f"No captions available for this video: {e}")
+            if languages:
+                transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+            else:
+                # Fetch whatever is available
+                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                transcript = next(iter(transcript_list))
+                transcript_data = transcript.fetch()
 
-    text = " ".join(entry["text"].strip() for entry in transcript_data if entry["text"].strip())
-    return text, language
+            text = " ".join(
+                entry.get("text", "").strip()
+                for entry in transcript_data
+                if entry.get("text", "").strip()
+            )
+            if text:
+                lang = "hindi" if languages == ["hi"] else "english" if languages == ["en"] else "hinglish"
+                return text, lang
+        except Exception:
+            continue
+
+    raise ValueError("No captions available for this video. Try a video with subtitles enabled.")
