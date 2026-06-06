@@ -22,7 +22,7 @@ interface Props {
 }
 
 const CX = 450;
-const CY = 350;
+const CY = 420;
 const SECTION_RADIUS = 220;
 const BULLET_RADIUS = 140;
 const MAX_BULLETS = 3;
@@ -233,7 +233,7 @@ export default function MindMap({ title, notes }: Props) {
 
   return (
     <svg
-      viewBox="0 0 900 700"
+      viewBox="0 0 900 840"
       width="100%"
       aria-label="Mind map"
       style={{ display: "block", background: "#ffffff" }}
