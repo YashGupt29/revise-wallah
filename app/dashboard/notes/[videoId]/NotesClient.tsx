@@ -414,16 +414,14 @@ export default function NotesClient({ video, isStarred }: Props) {
 <html>
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Kalam', cursive; background: white; }
+    body { font-family: 'Kalam', cursive; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @media print {
       @page { margin: 0.4in; size: A4; }
       body { margin: 0; }
-      /* ensure backgrounds (paper gradient) print */
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
   </style>
@@ -432,8 +430,13 @@ export default function NotesClient({ video, isStarred }: Props) {
 </html>`);
       win.document.close();
 
-      // Wait for font to load before printing
-      win.onload = () => setTimeout(() => { win.focus(); win.print(); }, 600);
+      // document.fonts.ready resolves only after ALL fonts (including Kalam CDN) are loaded
+      win.document.fonts.ready.then(() => {
+        win.requestAnimationFrame(() => {
+          win.focus();
+          win.print();
+        });
+      });
       return;
     }
 
