@@ -34,11 +34,12 @@ pipeline_image = (
     .pip_install(
         "yt-dlp==2024.12.13",
         "faster-whisper==1.1.0",
-        "google-generativeai==0.8.3",
+        "google-genai>=1.0.0",
         "supabase==2.10.0",
         "pydantic==2.10.3",
+        "fastapi[standard]>=0.115.0",
     )
-    .apt_install("ffmpeg")  # required by yt-dlp for audio extraction
+    .apt_install("ffmpeg")
 )
 
 app = modal.App("revise-wallah-pipeline", image=pipeline_image)

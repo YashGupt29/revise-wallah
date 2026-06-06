@@ -21,7 +21,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install deps
-        run: pip install modal pydantic google-generativeai supabase yt-dlp
+        run: pip install modal pydantic google-genai supabase yt-dlp "fastapi[standard]"
 
       - name: Write Modal token config
         run: |

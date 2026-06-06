@@ -9,7 +9,8 @@ import json
 import os
 import re
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from modal_pipeline.models.schemas import GeneratedContent
 from modal_pipeline.prompts import build_note_generation_prompt
@@ -26,23 +27,20 @@ def generate_notes(transcript: str) -> GeneratedContent:
     Raises:
         ValueError: if Gemini output cannot be parsed into the expected schema.
     """
-    api_key = os.environ["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
     system_prompt, user_prompt = build_note_generation_prompt(
         transcript[:_TRANSCRIPT_CHAR_CAP]
     )
 
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=system_prompt,
-    )
-
-    response = model.generate_content(
-        user_prompt,
-        generation_config=genai.GenerationConfig(
-            temperature=0.0,       # deterministic — required for cache correctness
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0.0,
             response_mime_type="application/json",
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         ),
     )
 
