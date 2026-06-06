@@ -401,41 +401,7 @@ export default function NotesClient({ video, isStarred }: Props) {
     track("export_triggered", { tab, video_id: video.id });
 
     if (tab === "handwritten") {
-      const paper = document.getElementById("handwritten-paper");
-      if (!paper) return;
-
-      const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap" rel="stylesheet" />
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Kalam', cursive; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    @media print {
-      @page { margin: 0.4in; size: A4; }
-      body { margin: 0; }
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    }
-  </style>
-</head>
-<body>${paper.outerHTML}</body>
-</html>`;
-
-      // Blob URL gives Chrome a real URL to snapshot — fixes empty PDF on save
-      const blob = new Blob([htmlContent], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, "_blank");
-      if (!win) { URL.revokeObjectURL(url); return; }
-
-      win.onload = () => {
-        win.document.fonts.ready.then(() => {
-          win.focus();
-          win.print();
-          setTimeout(() => URL.revokeObjectURL(url), 2000);
-        });
-      };
+      window.open(`/dashboard/notes/${video.id}/print`, "_blank");
       return;
     }
 
