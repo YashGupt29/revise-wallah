@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { track } from "@/lib/mixpanel";
-import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink, PenLine, Download } from "lucide-react";
+import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink, PenLine, Download, Network } from "lucide-react";
 import HandwrittenNotes from "@/components/HandwrittenNotes";
+import MindMap from "@/components/MindMap";
 import clsx from "clsx";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ interface Props {
   isStarred: boolean;
 }
 
-type Tab = "notes" | "flashcards" | "quiz" | "handwritten";
+type Tab = "notes" | "flashcards" | "quiz" | "handwritten" | "mindmap";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -395,6 +396,7 @@ export default function NotesClient({ video, isStarred }: Props) {
     { id: "flashcards", label: "Flashcards", icon: <Zap className="w-4 h-4" />, count: flashcards.length },
     { id: "quiz", label: "Quiz", icon: <HelpCircle className="w-4 h-4" />, count: quiz.length },
     { id: "handwritten", label: "Handwritten", icon: <PenLine className="w-4 h-4" /> },
+    { id: "mindmap", label: "Mind Map", icon: <Network className="w-4 h-4" /> },
   ];
 
   function exportPdf() {
@@ -574,6 +576,15 @@ export default function NotesClient({ video, isStarred }: Props) {
       )}
       {tab === "handwritten" && !generatedContent?.notes && (
         <div className="text-center py-20 text-gray-400">Handwritten notes not available.</div>
+      )}
+
+      {tab === "mindmap" && notes && (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <MindMap title={video.title ?? "Mind Map"} notes={notes} />
+        </div>
+      )}
+      {tab === "mindmap" && !notes && (
+        <div className="text-center py-20 text-gray-400">No notes available to display as a mind map.</div>
       )}
     </div>
   );
