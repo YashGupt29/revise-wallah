@@ -20,8 +20,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Modal
-        run: pip install modal
+      - name: Install Modal and pipeline deps
+        run: pip install modal pydantic google-generativeai supabase yt-dlp
 
       - name: Set Modal token
         run: modal token set --token-id ${{ secrets.MODAL_TOKEN_ID }} --token-secret ${{ secrets.MODAL_TOKEN_SECRET }}
