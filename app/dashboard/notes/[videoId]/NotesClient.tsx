@@ -401,16 +401,10 @@ export default function NotesClient({ video, isStarred }: Props) {
     track("export_triggered", { tab, video_id: video.id });
 
     if (tab === "handwritten") {
-      // New-window approach: outerHTML carries all inline styles,
-      // so nothing gets lost. Font is loaded fresh via CDN link.
       const paper = document.getElementById("handwritten-paper");
       if (!paper) return;
 
-      const html = paper.outerHTML;
-      const win = window.open("", "_blank");
-      if (!win) return;
-
-      win.document.write(`<!DOCTYPE html>
+      const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8" />
@@ -426,17 +420,22 @@ export default function NotesClient({ video, isStarred }: Props) {
     }
   </style>
 </head>
-<body>${html}</body>
-</html>`);
-      win.document.close();
+<body>${paper.outerHTML}</body>
+</html>`;
 
-      // document.fonts.ready resolves only after ALL fonts (including Kalam CDN) are loaded
-      win.document.fonts.ready.then(() => {
-        win.requestAnimationFrame(() => {
+      // Blob URL gives Chrome a real URL to snapshot — fixes empty PDF on save
+      const blob = new Blob([htmlContent], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank");
+      if (!win) { URL.revokeObjectURL(url); return; }
+
+      win.onload = () => {
+        win.document.fonts.ready.then(() => {
           win.focus();
           win.print();
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
         });
-      });
+      };
       return;
     }
 
