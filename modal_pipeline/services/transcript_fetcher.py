@@ -30,43 +30,21 @@ def fetch_transcript(youtube_url: str) -> tuple[str, str]:
 
     Returns:
         (transcript_text, detected_language)
-
-    Tries in order:
-        1. Hindi manual captions
-        2. English manual captions
-        3. Hindi auto-generated
-        4. English auto-generated
-        5. Any available transcript
     """
-    from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound
+    from youtube_transcript_api import YouTubeTranscriptApi
 
     video_id = _extract_video_id(youtube_url)
 
-    transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-
-    # Priority order for Indian educational content
-    language = "hinglish"
-    transcript = None
-
+    # Try preferred languages first, then fall back to any available
     try:
-        transcript = transcript_list.find_manually_created_transcript(["hi", "en"])
-        language = "hindi" if transcript.language_code == "hi" else "english"
-    except NoTranscriptFound:
-        pass
-
-    if not transcript:
+        transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=["hi", "en"])
+        language = "hindi" if transcript_data[0].get("language_code", "en") == "hi" else "english"
+    except Exception:
         try:
-            transcript = transcript_list.find_generated_transcript(["hi", "en"])
-            language = "hindi" if transcript.language_code == "hi" else "english"
-        except NoTranscriptFound:
-            pass
+            transcript_data = YouTubeTranscriptApi.get_transcript(video_id)
+            language = "hinglish"
+        except Exception as e:
+            raise ValueError(f"No captions available for this video: {e}")
 
-    if not transcript:
-        # Last resort — take whatever is available
-        transcript = next(iter(transcript_list))
-        language = "hinglish"
-
-    entries = transcript.fetch()
-    text = " ".join(entry["text"].strip() for entry in entries if entry["text"].strip())
-
+    text = " ".join(entry["text"].strip() for entry in transcript_data if entry["text"].strip())
     return text, language
