@@ -40,6 +40,7 @@ pipeline_image = (
         "fastapi[standard]>=0.115.0",
     )
     .apt_install("ffmpeg")
+    .add_local_python_source("modal_pipeline")
 )
 
 app = modal.App("revise-wallah-pipeline", image=pipeline_image)
