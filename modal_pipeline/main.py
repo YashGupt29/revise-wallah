@@ -13,7 +13,7 @@ import modal
 from pydantic import BaseModel
 
 from modal_pipeline.utils.supabase_client import get_supabase
-from modal_pipeline.services.generator import generate_notes
+from modal_pipeline.services.generator import generate_notes, generate_short_notes
 from modal_pipeline.services import parser
 
 # ─── Modal image ─────────────────────────────────────────────────────────────
@@ -78,6 +78,13 @@ def run_pipeline(
         _update_job(job_id, "processing", "generating", 30)
         content = generate_notes(transcript)
 
+        # ── Step 1b: Generate short notes ───────────────────────────────────
+        try:
+            short_notes = generate_short_notes(content.model_dump())
+        except Exception as e:
+            print(f"Short notes generation failed (non-fatal): {e}")
+            short_notes = None
+
         # ── Step 2: Parse into all formats ───────────────────────────────────
         _update_job(job_id, "processing", "parsing", 70)
         structured_md = parser.to_structured_markdown(content)
@@ -105,6 +112,7 @@ def run_pipeline(
                     "notes_handwritten": handwritten_html,
                     "flashcards_json": flashcards,
                     "quiz_json": quiz,
+                    "short_notes_json": short_notes,
                     "status": "done",
                 },
                 on_conflict="url_hash",

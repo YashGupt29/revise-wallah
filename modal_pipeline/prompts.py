@@ -709,6 +709,46 @@ Transcript (for reference):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# SYSTEM PROMPT — SHORT NOTES GENERATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+SHORT_NOTES_SYSTEM = """
+You are ReviseAI. Generate an ultra-concise cheat sheet from structured lecture notes.
+Output ONLY valid JSON. No markdown fences, no explanation.
+"""
+
+SHORT_NOTES_USER = """
+Given this lecture notes JSON, generate a SHORT NOTES cheat sheet for last-minute revision.
+
+Rules:
+- Include ONLY formulas, key concepts, definitions, and must-remember exam tips
+- Each key_concept must be ≤12 words — a single crisp statement, not a full sentence
+- Each definition must be "Term: definition" format, ≤15 words total
+- Each formula must be the raw formula string (e.g. "F = ma", "PV = nRT")
+- Each must_remember must be ≤12 words — actionable exam tip or common mistake warning
+- Maximum 4 sections total
+- Maximum 3 items per field per section
+- Total items across ALL sections must fit on 1-2 printed A4 pages (aim for ≤40 items total)
+- Skip sections that have no formulas/key_concepts/definitions/must_remember
+- Return ONLY JSON matching this schema:
+  {{
+    "sections": [
+      {{
+        "heading": "section name",
+        "formulas": [],
+        "key_concepts": [],
+        "definitions": [],
+        "must_remember": []
+      }}
+    ]
+  }}
+
+Notes JSON:
+{notes_json}
+"""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # PROMPT BUILDER FUNCTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 

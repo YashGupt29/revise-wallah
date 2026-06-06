@@ -74,3 +74,42 @@ def generate_notes(transcript: str) -> GeneratedContent:
             time.sleep(wait)
 
     raise last_exc
+
+
+def generate_short_notes(notes_json: dict) -> dict:
+    """
+    Generate ultra-concise short notes from the already-generated notes_json.
+    Uses the same Gemini client with retry logic.
+    """
+    import json, os, re, time
+    from modal_pipeline.prompts import SHORT_NOTES_SYSTEM, SHORT_NOTES_USER
+
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    user_prompt = SHORT_NOTES_USER.format(notes_json=json.dumps(notes_json, indent=2)[:8000])
+
+    last_exc: Exception = RuntimeError("No attempts made")
+    for attempt in range(_MAX_RETRIES):
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SHORT_NOTES_SYSTEM,
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                ),
+            )
+            raw = response.text.strip()
+            raw = re.sub(r"^```(?:json)?\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw)
+            return json.loads(raw)
+        except Exception as exc:
+            last_exc = exc
+            err_str = str(exc).lower()
+            is_retryable = "503" in err_str or "unavailable" in err_str or "429" in err_str or "quota" in err_str or "rate" in err_str
+            if not is_retryable or attempt == _MAX_RETRIES - 1:
+                raise
+            wait = _RETRY_BACKOFF[attempt]
+            print(f"Short notes attempt {attempt + 1} failed ({exc}), retrying in {wait}s…")
+            time.sleep(wait)
+    raise last_exc

@@ -87,6 +87,17 @@ class GlossaryEntry(BaseModel):
     example: str = ""
 
 
+class ShortNoteSection(BaseModel):
+    heading: str
+    formulas: list[str] = []
+    key_concepts: list[str] = []   # one-liner each, max 12 words
+    definitions: list[str] = []    # "Term: crisp definition"
+    must_remember: list[str] = []  # exam tips, mnemonics, common mistakes
+
+class ShortNotesContent(BaseModel):
+    sections: list[ShortNoteSection] = []
+
+
 class GeneratedContent(BaseModel):
     title: str
     subject: str
