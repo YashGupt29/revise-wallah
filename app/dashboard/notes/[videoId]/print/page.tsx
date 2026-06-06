@@ -53,31 +53,18 @@ export default async function PrintPage({ params }: Props) {
   return (
     <>
       <style>{`
-        /* Hide dashboard chrome during print */
-        @media print {
-          aside,
-          nav,
-          header,
-          footer {
-            display: none !important;
-          }
-          /* Let the main area fill the full page */
-          .flex.h-screen { display: block !important; }
-          main { overflow: visible !important; }
-          main > div { max-width: none !important; padding: 0 !important; }
-
-          @page { margin: 0.4in; size: A4; }
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
+        @page { margin: 0.4in; size: A4; }
+        html, body {
+          margin: 0;
+          padding: 0;
+          background: white;
+          height: auto !important;
+          overflow: visible !important;
         }
-        /* Also hide sidebar visually so the print preview looks clean */
-        @media screen {
-          aside { display: none !important; }
-          main > div { max-width: none !important; padding: 0 !important; }
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
-        body { margin: 0; background: white; }
       `}</style>
 
       <HandwrittenNotes

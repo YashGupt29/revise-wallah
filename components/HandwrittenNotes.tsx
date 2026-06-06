@@ -261,19 +261,32 @@ export default function HandwrittenNotes({
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: white; }
+          body { background: white; margin: 0; }
+          .handwritten-outer {
+            transform: none !important;
+          }
           .paper {
             box-shadow: none !important;
             background-image: none !important;
             background-color: white !important;
             transform: none !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 20px 40px 40px 60px !important;
+            position: static !important;
+            overflow: visible !important;
+            height: auto !important;
+            page-break-inside: auto;
+          }
+          .paper > div {
+            page-break-inside: avoid;
           }
         }
       `}</style>
 
-      {/* Outer wrapper: slight whole-page tilt */}
+      {/* Outer wrapper: slight whole-page tilt (removed in print via CSS) */}
       <div
-        className={kalam.className}
+        className={`${kalam.className} handwritten-outer`}
         style={{ transform: "rotate(-0.2deg)", transformOrigin: "top center" }}
       >
         {/* Paper */}
