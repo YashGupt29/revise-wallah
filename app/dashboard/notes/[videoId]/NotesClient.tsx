@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { track } from "@/lib/mixpanel";
-import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink, PenLine } from "lucide-react";
+import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink, PenLine, Download } from "lucide-react";
 import HandwrittenNotes from "@/components/HandwrittenNotes";
 import clsx from "clsx";
 
@@ -397,8 +397,23 @@ export default function NotesClient({ video, isStarred }: Props) {
     { id: "handwritten", label: "Handwritten", icon: <PenLine className="w-4 h-4" /> },
   ];
 
-  async function toggleStar() {
-    const next = !starred;
+  function exportPdf() {
+    const id = tab === "handwritten" ? "handwritten-paper" : "notes-print-content";
+    const style = document.createElement("style");
+    style.innerHTML = `
+      @media print {
+        body * { visibility: hidden !important; }
+        #${id}, #${id} * { visibility: visible !important; }
+        #${id} { position: absolute; top: 0; left: 0; width: 100%; }
+      }
+    `;
+    document.head.appendChild(style);
+    track("export_triggered", { tab, video_id: video.id });
+    window.print();
+    document.head.removeChild(style);
+  }
+
+  async function toggleStar() {    const next = !starred;
     setStarred(next);
     track("note_starred", { video_id: video.id, starred: next });
     await fetch(`/api/notes/${video.id}/star`, {
@@ -501,11 +516,26 @@ export default function NotesClient({ video, isStarred }: Props) {
         ))}
       </div>
 
-      {/* Content */}
-      {tab === "notes" && notes && <NotesTab notes={notes} />}
-      {tab === "notes" && !notes && (
-        <div className="text-center py-20 text-gray-400">Notes not available for this video.</div>
+      {/* Export button — only for notes + handwritten */}
+      {(tab === "notes" || tab === "handwritten") && (
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={exportPdf}
+            className="flex items-center gap-1.5 text-xs font-medium text-purple-700 border border-purple-200 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export PDF
+          </button>
+        </div>
       )}
+
+      {/* Content */}
+      <div id="notes-print-content">
+        {tab === "notes" && notes && <NotesTab notes={notes} />}
+        {tab === "notes" && !notes && (
+          <div className="text-center py-20 text-gray-400">Notes not available for this video.</div>
+        )}
+      </div>
 
       {tab === "flashcards" && flashcards.length > 0 && <FlashcardsTab cards={flashcards} />}
       {tab === "flashcards" && flashcards.length === 0 && (

@@ -278,6 +278,7 @@ export default function HandwrittenNotes({
       >
         {/* Paper */}
         <div
+          id="handwritten-paper"
           className="paper"
           style={{
             backgroundColor: "#fffef0",
@@ -476,37 +477,6 @@ export default function HandwrittenNotes({
         </div>
       </div>
 
-      {/* ── Sticky Print Button ── */}
-      <button
-        className="no-print"
-        onClick={() => window.print()}
-        style={{
-          position: "fixed",
-          bottom: "28px",
-          right: "28px",
-          background: "#6366f1",
-          color: "#ffffff",
-          border: "none",
-          borderRadius: "999px",
-          padding: "10px 20px",
-          fontSize: "0.88rem",
-          fontWeight: 600,
-          cursor: "pointer",
-          boxShadow: "0 4px 14px rgba(99,102,241,0.4)",
-          letterSpacing: "0.01em",
-          fontFamily: "inherit",
-          zIndex: 50,
-          transition: "background 0.15s ease",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "#4f46e5";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "#6366f1";
-        }}
-      >
-        🖨 Print / Save PDF
-      </button>
     </>
   );
 }
