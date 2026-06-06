@@ -4,7 +4,7 @@
  * Flow:
  *  1. Validate URL
  *  2. Check cache
- *  3. Assert minutes
+ *  3. [TESTING: minutes check disabled] Assert minutes
  *  4. Fetch transcript + metadata (from Next.js — not blocked by YouTube)
  *  5. Create job record
  *  6. Trigger Modal with transcript (Modal only runs LLM — no YouTube access)
@@ -16,13 +16,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeYouTubeUrl, hashUrl, isYouTubeUrl } from "@/lib/url";
 import { checkCache } from "@/lib/pipeline/cache";
-import { assertSufficientMinutes, deductMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
+// import { assertSufficientMinutes, deductMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
 import { triggerPipeline } from "@/lib/pipeline/modal";
 import { fetchTranscript } from "@/lib/pipeline/transcript";
 import { track } from "@/lib/mixpanel";
 
-const CACHE_HIT_COST = 5;
-const DEFAULT_MISS_COST = 10;
+// const CACHE_HIT_COST = 5;
+// const DEFAULT_MISS_COST = 10;
 
 export async function POST(req: NextRequest) {
   // ── Auth ─────────────────────────────────────────────────────────────────
@@ -50,17 +50,18 @@ export async function POST(req: NextRequest) {
   const cached = await checkCache(urlHash);
 
   if (cached) {
-    try {
-      await assertSufficientMinutes(user.id, CACHE_HIT_COST);
-    } catch (err) {
-      if (err instanceof InsufficientMinutesError) {
-        return NextResponse.json(
-          { error: "Not enough minutes. Top up to continue.", code: "insufficient_minutes" },
-          { status: 402 }
-        );
-      }
-      throw err;
-    }
+    // [TESTING: minutes check disabled]
+    // try {
+    //   await assertSufficientMinutes(user.id, CACHE_HIT_COST);
+    // } catch (err) {
+    //   if (err instanceof InsufficientMinutesError) {
+    //     return NextResponse.json(
+    //       { error: "Not enough minutes. Top up to continue.", code: "insufficient_minutes" },
+    //       { status: 402 }
+    //     );
+    //   }
+    //   throw err;
+    // }
 
     const admin = createAdminClient();
     await admin.from("user_notes").upsert(
@@ -68,21 +69,21 @@ export async function POST(req: NextRequest) {
       { onConflict: "user_id,processed_video_id" }
     );
 
-    const newBalance = await deductMinutes(user.id, CACHE_HIT_COST, "cache_hit", cached.processed_video_id);
+    // const newBalance = await deductMinutes(user.id, CACHE_HIT_COST, "cache_hit", cached.processed_video_id);
 
     track("study_kit_generated", {
       cache_hit: true,
       duration_seconds: cached.duration_seconds,
       language: cached.language,
-      minutes_cost: CACHE_HIT_COST,
-      balance_after: newBalance,
+      // minutes_cost: CACHE_HIT_COST,
+      // balance_after: newBalance,
     });
 
     return NextResponse.json({
       type: "cache_hit",
       processed_video_id: cached.processed_video_id,
       title: cached.title,
-      minutes_remaining: newBalance,
+      // minutes_remaining: newBalance,
     });
   }
 
@@ -101,18 +102,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Assert minutes ────────────────────────────────────────────────────────
-  try {
-    await assertSufficientMinutes(user.id, DEFAULT_MISS_COST);
-  } catch (err) {
-    if (err instanceof InsufficientMinutesError) {
-      return NextResponse.json(
-        { error: "Not enough minutes. Top up to continue.", code: "insufficient_minutes" },
-        { status: 402 }
-      );
-    }
-    throw err;
-  }
+  // ── Assert minutes [TESTING: disabled] ────────────────────────────────────
+  // try {
+  //   await assertSufficientMinutes(user.id, DEFAULT_MISS_COST);
+  // } catch (err) {
+  //   if (err instanceof InsufficientMinutesError) {
+  //     return NextResponse.json(
+  //       { error: "Not enough minutes. Top up to continue.", code: "insufficient_minutes" },
+  //       { status: 402 }
+  //     );
+  //   }
+  //   throw err;
+  // }
 
   // ── Get video metadata via oEmbed ─────────────────────────────────────────
   let title = "";
