@@ -24,8 +24,8 @@ interface Props {
 const CX = 450;
 const CY = 420;
 const SECTION_RADIUS = 220;
-const BULLET_RADIUS = 140;
-const MAX_BULLETS = 3;
+const BULLET_RADIUS = 155;
+const MAX_BULLETS = 2;
 const TRUNCATE_LEN = 40;
 
 function truncate(text: string, len: number = TRUNCATE_LEN): string {
@@ -158,7 +158,7 @@ export default function MindMap({ title, notes }: Props) {
 
     bullets.forEach((bullet, bi) => {
       // Spread bullets in a 60° arc centered on the section angle (outward from center)
-      const spread = bulletCount > 1 ? (Math.PI / 3) : 0;
+      const spread = bulletCount > 1 ? (Math.PI * 80 / 180) : 0; // 80° arc
       const startAngle = angle - spread / 2;
       const bulletAngle = bulletCount > 1
         ? startAngle + (spread / (bulletCount - 1)) * bi
