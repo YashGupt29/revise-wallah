@@ -19,19 +19,19 @@ import modal
 
 from pydantic import BaseModel
 
-from modal_pipeline.utils.url import normalize_youtube_url, hash_url
 from modal_pipeline.utils.supabase_client import get_supabase
+from modal_pipeline.services.transcript_fetcher import fetch_transcript
 from modal_pipeline.services.audio import extract_audio
 from modal_pipeline.services.transcriber import transcribe
 from modal_pipeline.services.generator import generate_notes
 from modal_pipeline.services import parser
 
 # ─── Modal image definition ──────────────────────────────────────────────────
-# Pin all deps for reproducible builds
 
 pipeline_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install(
+        "youtube-transcript-api>=0.6.2",
         "yt-dlp==2024.12.13",
         "faster-whisper==1.1.0",
         "google-genai>=1.0.0",
@@ -52,6 +52,19 @@ pipeline_secrets = modal.Secret.from_name("revise-wallah-secrets")
 
 
 # ─── Job status helper ────────────────────────────────────────────────────────
+
+def _fetch_metadata(youtube_url: str) -> dict:
+    """Fetch video metadata without downloading audio."""
+    import yt_dlp
+    ydl_opts = {"quiet": True, "no_warnings": True, "skip_download": True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(youtube_url, download=False)
+    return {
+        "title": info.get("title", ""),
+        "channel_name": info.get("uploader", ""),
+        "duration_seconds": int(info.get("duration", 0)),
+    }
+
 
 def _update_job(job_id: str, status: str, step: str, progress: int, error: str = None):
     """Update job record in Supabase — triggers Realtime event on frontend."""
@@ -84,17 +97,22 @@ def run_pipeline(job_id: str, youtube_url: str, url_hash: str):
     sb = get_supabase()
 
     try:
-        # ── Step 1: Extract audio ────────────────────────────────────────────
+        # ── Step 1: Get transcript ────────────────────────────────────────────
+        # Try YouTube captions first (fast, no bot detection).
+        # Fall back to yt-dlp + Whisper if captions unavailable.
         _update_job(job_id, "processing", "extracting", 10)
 
-        with tempfile.TemporaryDirectory() as tmp:
-            audio_path, metadata = extract_audio(youtube_url, tmp)
+        try:
+            transcript, language = fetch_transcript(youtube_url)
+            metadata = _fetch_metadata(youtube_url)
+        except Exception:
+            # Captions unavailable — download audio and transcribe
+            with tempfile.TemporaryDirectory() as tmp:
+                audio_path, metadata = extract_audio(youtube_url, tmp)
+                _update_job(job_id, "processing", "transcribing", 35)
+                transcript, language = transcribe(audio_path)
 
-            # ── Step 2: Transcribe ───────────────────────────────────────────
-            _update_job(job_id, "processing", "transcribing", 35)
-            transcript, language = transcribe(audio_path)
-
-        # ── Step 3: Generate notes ───────────────────────────────────────────
+        # ── Step 2: Generate notes ───────────────────────────────────────────
         _update_job(job_id, "processing", "generating", 65)
         content = generate_notes(transcript)
 
