@@ -12,17 +12,30 @@ export interface TranscriptResult {
   language: string;
 }
 
-export async function fetchTranscript(youtubeUrl: string): Promise<TranscriptResult> {
-  const entries = await YoutubeTranscript.fetchTranscript(youtubeUrl);
+// Priority order: English variants first, then Hindi, then any available
+const LANG_PRIORITY = ["en", "en-US", "en-GB", "en-IN", "hi", "hi-IN"];
 
+export async function fetchTranscript(youtubeUrl: string): Promise<TranscriptResult> {
+  // Try preferred languages in priority order
+  for (const lang of LANG_PRIORITY) {
+    try {
+      const entries = await YoutubeTranscript.fetchTranscript(youtubeUrl, { lang });
+      if (entries && entries.length > 0) {
+        const text = entries.map((e) => e.text.trim()).filter(Boolean).join(" ");
+        return { text, language: lang.startsWith("hi") ? "hindi" : "english" };
+      }
+    } catch {
+      // This language not available — try next
+    }
+  }
+
+  // Final fallback: let YouTube pick (could be any language)
+  const entries = await YoutubeTranscript.fetchTranscript(youtubeUrl);
   if (!entries || entries.length === 0) {
     throw new Error("No captions available for this video.");
   }
 
-  const text = entries
-    .map((e) => e.text.trim())
-    .filter(Boolean)
-    .join(" ");
-
+  const text = entries.map((e) => e.text.trim()).filter(Boolean).join(" ");
   return { text, language: "auto" };
 }
+
