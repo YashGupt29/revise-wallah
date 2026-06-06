@@ -101,20 +101,10 @@ def run_pipeline(job_id: str, youtube_url: str, url_hash: str):
     sb = get_supabase()
 
     try:
-        # ── Step 1: Get transcript ────────────────────────────────────────────
-        # Try YouTube captions first (fast, no bot detection).
-        # Fall back to yt-dlp + Whisper if captions unavailable.
+        # ── Step 1: Fetch transcript ──────────────────────────────────────────
         _update_job(job_id, "processing", "extracting", 10)
-
-        try:
-            transcript, language = fetch_transcript(youtube_url)
-            metadata = _fetch_metadata(youtube_url)
-        except Exception:
-            # Captions unavailable — download audio and transcribe
-            with tempfile.TemporaryDirectory() as tmp:
-                audio_path, metadata = extract_audio(youtube_url, tmp)
-                _update_job(job_id, "processing", "transcribing", 35)
-                transcript, language = transcribe(audio_path)
+        transcript, language = fetch_transcript(youtube_url)
+        metadata = _fetch_metadata(youtube_url)
 
         # ── Step 2: Generate notes ───────────────────────────────────────────
         _update_job(job_id, "processing", "generating", 65)
