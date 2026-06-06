@@ -19,11 +19,15 @@ interface Props {
   data: MindMapData;
 }
 
-const CX = 480;
-const CY = 450;
+const CX = 500;
+const CY = 480;
 const SECTION_RADIUS = 220;
-const BULLET_RADIUS = 175;
-const MAX_BULLETS = 3;
+const BULLET_RADIUS = 200;
+const MAX_BULLETS = 2;
+
+// Leaf box dimensions — must satisfy: 2 * BULLET_RADIUS * sin(spread/2) > LEAF_W + padding
+const LEAF_W = 120;
+const LEAF_H = 65;
 
 // Compute (x, y) from center at angle (radians) and distance
 function polar(cx: number, cy: number, angle: number, r: number): [number, number] {
@@ -143,17 +147,18 @@ export default function MindMap({ data }: Props) {
       />
     );
 
-    // Children (leaves) — max 3
+    // Children (leaves) — max 2
     const children = (branch.children ?? []).slice(0, MAX_BULLETS);
     const childCount = children.length;
 
-    // Adaptive spread: cap at 55% of the inter-branch gap so leaves never
-    // collide with the neighbouring branch's leaves
+    // Spread must satisfy: 2 * BULLET_RADIUS * sin(spread/2) >= LEAF_W + 30px gap
+    // Also must not exceed 65% of the inter-branch gap to avoid neighbour collision
     const interBranchGap = (2 * Math.PI) / branchCount;
-    const maxSpread = Math.min(Math.PI * 65 / 180, interBranchGap * 0.5);
+    const minSpread = 2 * Math.asin((LEAF_W + 30) / (2 * BULLET_RADIUS)); // geometry-enforced minimum
+    const maxSpread = Math.min(Math.PI * 60 / 180, interBranchGap * 0.65);
+    const spread = childCount > 1 ? Math.max(minSpread, maxSpread) : 0;
 
     children.forEach((child, bi) => {
-      const spread = childCount > 1 ? maxSpread : 0;
       const startAngle = angle - spread / 2;
       const leafAngle = childCount > 1
         ? startAngle + (spread / (childCount - 1)) * bi
@@ -183,8 +188,8 @@ export default function MindMap({ data }: Props) {
           text={child.label}
           fill="#f3f4f6"
           textColor="#374151"
-          width={155}
-          height={76}
+          width={LEAF_W}
+          height={LEAF_H}
           rx={8}
           fontSize={10}
         />
@@ -228,7 +233,7 @@ export default function MindMap({ data }: Props) {
 
   return (
     <svg
-      viewBox="0 0 960 900"
+      viewBox="0 0 1000 960"
       width="100%"
       aria-label="Mind map"
       style={{ display: "block", background: "#ffffff" }}
