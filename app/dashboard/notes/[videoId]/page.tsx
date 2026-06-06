@@ -38,7 +38,6 @@ export default async function NotesPage({ params }: Props) {
     <NotesClient
       video={video}
       isStarred={userNote.is_starred ?? false}
-      userNoteId={userNote.id}
     />
   );
 }

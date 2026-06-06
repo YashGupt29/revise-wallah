@@ -58,7 +58,6 @@ interface Video {
 interface Props {
   video: Video;
   isStarred: boolean;
-  userNoteId: string;
 }
 
 type Tab = "notes" | "flashcards" | "quiz";
@@ -378,7 +377,7 @@ function QuizTab({ questions }: { questions: QuizQuestion[] }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function NotesClient({ video, isStarred, userNoteId }: Props) {
+export default function NotesClient({ video, isStarred }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("notes");
   const [starred, setStarred] = useState(isStarred);
@@ -397,7 +396,7 @@ export default function NotesClient({ video, isStarred, userNoteId }: Props) {
     const next = !starred;
     setStarred(next);
     track("note_starred", { video_id: video.id, starred: next });
-    await fetch(`/api/notes/${userNoteId}/star`, {
+    await fetch(`/api/notes/${video.id}/star`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ is_starred: next }),
