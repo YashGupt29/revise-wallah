@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Zap, Star, Crown, Sparkles } from "lucide-react";
+import { Check, Zap, Star, Crown, Sparkles, Tag } from "lucide-react";
 import { track } from "@/lib/mixpanel";
 import { PLANS, planRank, type Plan, type PlanConfig } from "@/lib/plan/features";
 
@@ -56,6 +56,34 @@ export default function UpgradeClient({ currentPlan }: { currentPlan: Plan }) {
   const router = useRouter();
   const [loading, setLoading] = useState<Plan | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoSuccess, setPromoSuccess] = useState<string | null>(null);
+
+  async function handlePromo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!promoCode.trim()) return;
+    setPromoLoading(true);
+    setPromoError(null);
+    setPromoSuccess(null);
+
+    const res = await fetch("/api/payment/promo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: promoCode.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      setPromoSuccess(`Pro plan activated for 30 days!`);
+      track("promo_redeemed", { plan: data.plan });
+      setTimeout(() => { router.push("/dashboard?payment=success"); router.refresh(); }, 1500);
+    } else {
+      setPromoError(data.error ?? "Invalid code.");
+    }
+    setPromoLoading(false);
+  }
 
   async function handleUpgrade(plan: PlanConfig) {
     if (plan.priceInr === 0) return;
@@ -240,6 +268,36 @@ export default function UpgradeClient({ currentPlan }: { currentPlan: Plan }) {
         Downgrades take effect at end of current billing period.
         Contact support@revisewallah.com for help.
       </p>
+
+      {/* Promo code */}
+      <div className="mt-8 max-w-sm">
+        <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+          <Tag className="w-4 h-4 text-purple-500" />
+          Have a promo code?
+        </p>
+        <form onSubmit={handlePromo} className="flex gap-2">
+          <input
+            type="text"
+            value={promoCode}
+            onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(null); }}
+            placeholder="Enter code"
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-mono uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400"
+          />
+          <button
+            type="submit"
+            disabled={promoLoading || !promoCode.trim()}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+          >
+            {promoLoading ? "..." : "Apply"}
+          </button>
+        </form>
+        {promoError && (
+          <p className="mt-1.5 text-xs text-red-600">{promoError}</p>
+        )}
+        {promoSuccess && (
+          <p className="mt-1.5 text-xs text-green-600 font-medium">{promoSuccess}</p>
+        )}
+      </div>
     </div>
   );
 }
