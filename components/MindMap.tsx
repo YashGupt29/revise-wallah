@@ -203,8 +203,8 @@ function MindMapSVG({ root, sections }: Props) {
   return (
     <svg
       viewBox={`0 0 ${canvasW} ${canvasH}`}
-      width={canvasW}
-      style={{ display: "block", background: BG, minWidth: canvasW }}
+      width="100%"
+      style={{ display: "block", background: BG }}
     >
       {lines}
       {nodes}
@@ -276,20 +276,14 @@ export default function MindMap({ root, sections }: Props) {
   }
 
   return (
-    <div style={{ position: "relative", background: "#faf5ff", borderRadius: 12, overflow: "hidden", border: "1px solid #e9d5ff" }}>
-      <button
-        onClick={() => setFullscreen(true)}
-        style={{
-          position: "absolute", top: 12, right: 12, zIndex: 10,
-          background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8,
-          padding: "6px 12px", color: "#7c3aed", cursor: "pointer", fontSize: 12, fontWeight: 500,
-        }}
-      >
+    <div
+      onClick={() => setFullscreen(true)}
+      style={{ position: "relative", background: "#faf5ff", borderRadius: 12, overflow: "hidden", border: "1px solid #e9d5ff", cursor: "zoom-in" }}
+    >
+      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 10, background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "6px 12px", color: "#7c3aed", fontSize: 12, fontWeight: 500, pointerEvents: "none" }}>
         ⛶ Fullscreen
-      </button>
-      <div style={{ overflow: "auto", maxHeight: 560 }}>
-        {map}
       </div>
+      {map}
     </div>
   );
 }
