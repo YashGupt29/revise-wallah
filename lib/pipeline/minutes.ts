@@ -50,28 +50,19 @@ export async function deductMinutes(
     .eq("id", userId)
     .single();
 
+  const { data: userRow } = await admin
+    .from("users")
+    .select("total_minutes_used")
+    .eq("id", userId)
+    .single();
+
   const newBalance = Math.max(0, (user?.minutes_remaining ?? 0) - amount);
 
   await admin
     .from("users")
     .update({
       minutes_remaining: newBalance,
-      total_minutes_used: admin.rpc("increment", { x: amount }), // handled below
-    })
-    .eq("id", userId);
-
-  // Simpler: just update both fields directly
-  const currentUsed = await admin
-    .from("users")
-    .select("total_minutes_used")
-    .eq("id", userId)
-    .single();
-
-  await admin
-    .from("users")
-    .update({
-      minutes_remaining: newBalance,
-      total_minutes_used: (currentUsed.data?.total_minutes_used ?? 0) + amount,
+      total_minutes_used: (userRow?.total_minutes_used ?? 0) + amount,
     })
     .eq("id", userId);
 

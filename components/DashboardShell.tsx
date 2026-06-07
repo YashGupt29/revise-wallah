@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import clsx from "clsx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 interface Profile {
   id: string;
@@ -39,7 +40,28 @@ export default function DashboardShell({
   const router = useRouter();
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [minutes, setMinutes] = useState(profile?.minutes_remaining ?? 0);
   const supabase = createClient();
+
+  // Live balance updates via Realtime
+  useEffect(() => {
+    if (!profile?.id) return;
+    let channel: RealtimeChannel;
+    channel = supabase
+      .channel("user-minutes")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "users", filter: `id=eq.${profile.id}` },
+        (payload) => {
+          const updated = payload.new as { minutes_remaining?: number };
+          if (typeof updated.minutes_remaining === "number") {
+            setMinutes(updated.minutes_remaining);
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id]);
 
   // Re-identify on every app re-open (required per Mixpanel identity spec)
   useEffect(() => {
@@ -64,10 +86,7 @@ export default function DashboardShell({
     router.refresh();
   }
 
-  const minutesPct = Math.min(
-    100,
-    Math.round(((profile?.minutes_remaining ?? 0) / 60) * 100)
-  );
+  const minutesPct = Math.min(100, Math.round((minutes / 60) * 100));
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -111,7 +130,7 @@ export default function DashboardShell({
                 Minutes left
               </div>
               <span className="text-xs font-bold text-purple-700">
-                {profile?.minutes_remaining ?? 0}
+                {minutes}
               </span>
             </div>
             <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">

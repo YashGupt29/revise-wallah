@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import DashboardClient from "@/components/DashboardClient";
+import { Suspense } from "react";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -19,5 +20,9 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false })
     .limit(20);
 
-  return <DashboardClient initialNotes={(notes ?? []) as Parameters<typeof DashboardClient>[0]["initialNotes"]} />;
+  return (
+    <Suspense>
+      <DashboardClient initialNotes={(notes ?? []) as Parameters<typeof DashboardClient>[0]["initialNotes"]} />
+    </Suspense>
+  );
 }

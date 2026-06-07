@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import UrlSubmitForm from "@/components/UrlSubmitForm";
 import JobStatusCard from "@/components/JobStatusCard";
 import { track } from "@/lib/mixpanel";
+import { CheckCircle, X } from "lucide-react";
 
 interface Note {
   id: string;
@@ -32,8 +33,19 @@ interface Props {
 
 export default function DashboardClient({ initialNotes }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [notes, setNotes] = useState(initialNotes);
+  const [paymentSuccess, setPaymentSuccess] = useState(searchParams.get("payment") === "success");
+
+  // Clear the ?payment=success param from URL without reloading
+  useEffect(() => {
+    if (paymentSuccess) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, []);
 
   function handleJobCreated(jobId: string) {
     setActiveJobId(jobId);
@@ -54,6 +66,18 @@ export default function DashboardClient({ initialNotes }: Props) {
 
   return (
     <div>
+      {/* Payment success banner */}
+      {paymentSuccess && (
+        <div className="mb-6 flex items-center justify-between gap-3 bg-green-50 border border-green-200 text-green-800 text-sm font-medium rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+            Minutes added to your account! You&apos;re ready to generate more study kits.
+          </div>
+          <button onClick={() => setPaymentSuccess(false)} className="text-green-600 hover:text-green-800 flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {/* URL input */}
       <div className="mb-8 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
