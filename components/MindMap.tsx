@@ -30,15 +30,18 @@ const H_CB = 80;     // horiz gap: center → branch
 const H_BL = 56;     // horiz gap: branch → leaf
 const CANVAS_PAD = 60;
 
-// ── Colors ────────────────────────────────────────────────────────────────────
+// ── Colors (app palette: white + purple/pink) ─────────────────────────────────
 
-const BG = "#0f172a";
-const C_CENTER = "#1d4ed8";
-const C_BRANCH = "#1e3a5f";
-const C_LEAF = "#1e293b";
-const T_WHITE = "#f1f5f9";
-const T_MUTED = "#94a3b8";
-const C_LINE = "#3b82f6";
+const BG = "#ffffff";
+const C_CENTER = "#7c3aed";       // purple-700
+const C_BRANCH = "#f3e8ff";       // purple-100 fill
+const C_BRANCH_BORDER = "#a855f7"; // purple-500 stroke
+const C_LEAF = "#fdf4ff";         // purple-50 fill
+const C_LEAF_BORDER = "#e9d5ff";  // purple-200 stroke
+const T_WHITE = "#ffffff";
+const T_BRANCH = "#6b21a8";       // purple-800
+const T_LEAF = "#374151";         // gray-700
+const C_LINE = "#c084fc";         // purple-400
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,11 +52,12 @@ function leafHeight(text: string): number {
   return lines * L_LINE + L_PAD * 2;
 }
 
-/** Group info for a single section */
+/** Group info for a single section — bullets capped at 5 */
 function groupInfo(section: Section) {
-  const heights = section.bullets.map(leafHeight);
+  const bullets = section.bullets.slice(0, 5);
+  const heights = bullets.map(leafHeight);
   const totalLeaf = heights.reduce((a, b) => a + b, 0) + LEAF_GAP * Math.max(0, heights.length - 1);
-  return { heights, totalLeaf, groupH: Math.max(BH + 16, totalLeaf) };
+  return { bullets, heights, totalLeaf, groupH: Math.max(BH + 16, totalLeaf) };
 }
 
 /** S-curve bezier between two points (horizontal bias) */
@@ -75,14 +79,15 @@ function sCurve(x1: number, y1: number, x2: number, y2: number, key: string) {
 
 interface NodeProps {
   x: number; y: number; w: number; h: number;
-  text: string; bg: string; color: string;
+  text: string; bg: string; color: string; stroke?: string;
   fontSize: number; bold?: boolean; rx?: number;
 }
 
-function MNode({ x, y, w, h, text, bg, color, fontSize, bold, rx = 10 }: NodeProps) {
+function MNode({ x, y, w, h, text, bg, color, stroke, fontSize, bold, rx = 10 }: NodeProps) {
   return (
     <g>
-      <rect x={x} y={y - h / 2} width={w} height={h} rx={rx} fill={bg} />
+      <rect x={x} y={y - h / 2} width={w} height={h} rx={rx} fill={bg}
+        stroke={stroke} strokeWidth={stroke ? 1.5 : 0} />
       <foreignObject x={x + 8} y={y - h / 2 + L_PAD / 2} width={w - 16} height={h - L_PAD}>
         {/* @ts-ignore */}
         <div
@@ -146,17 +151,19 @@ function MindMapSVG({ root, sections }: Props) {
     lines.push(sCurve(cLeft, cy, lBranchR, bY, `lc-${bi}`));
     nodes.push(
       <MNode key={`lb-${bi}`} x={lBranchL} y={bY} w={BW} h={BH}
-        text={section.heading} bg={C_BRANCH} color={T_WHITE} fontSize={11} bold />
+        text={section.heading} bg={C_BRANCH} color={T_BRANCH} stroke={C_BRANCH_BORDER}
+        fontSize={11} bold />
     );
 
     let leafY = bY - info.totalLeaf / 2;
-    section.bullets.forEach((bullet, ci) => {
+    info.bullets.forEach((bullet, ci) => {
       const lh = info.heights[ci];
       const lmY = leafY + lh / 2;
       lines.push(sCurve(lBranchL, bY, lLeafR, lmY, `ll-${bi}-${ci}`));
       nodes.push(
         <MNode key={`llf-${bi}-${ci}`} x={lLeafL} y={lmY} w={LW} h={lh}
-          text={bullet} bg={C_LEAF} color={T_MUTED} fontSize={L_FONT} rx={8} />
+          text={bullet} bg={C_LEAF} color={T_LEAF} stroke={C_LEAF_BORDER}
+          fontSize={L_FONT} rx={8} />
       );
       leafY += lh + LEAF_GAP;
     });
@@ -173,17 +180,19 @@ function MindMapSVG({ root, sections }: Props) {
     lines.push(sCurve(cRight, cy, rBranchL, bY, `rc-${bi}`));
     nodes.push(
       <MNode key={`rb-${bi}`} x={rBranchL} y={bY} w={BW} h={BH}
-        text={section.heading} bg={C_BRANCH} color={T_WHITE} fontSize={11} bold />
+        text={section.heading} bg={C_BRANCH} color={T_BRANCH} stroke={C_BRANCH_BORDER}
+        fontSize={11} bold />
     );
 
     let leafY = bY - info.totalLeaf / 2;
-    section.bullets.forEach((bullet, ci) => {
+    info.bullets.forEach((bullet, ci) => {
       const lh = info.heights[ci];
       const lmY = leafY + lh / 2;
       lines.push(sCurve(rBranchR, bY, rLeafL, lmY, `rl-${bi}-${ci}`));
       nodes.push(
         <MNode key={`rlf-${bi}-${ci}`} x={rLeafL} y={lmY} w={LW} h={lh}
-          text={bullet} bg={C_LEAF} color={T_MUTED} fontSize={L_FONT} rx={8} />
+          text={bullet} bg={C_LEAF} color={T_LEAF} stroke={C_LEAF_BORDER}
+          fontSize={L_FONT} rx={8} />
       );
       leafY += lh + LEAF_GAP;
     });
@@ -243,14 +252,14 @@ export default function MindMap({ root, sections }: Props) {
   if (fullscreen) {
     return (
       <div
-        style={{ position: "fixed", inset: 0, zIndex: 9999, background: BG, overflow: "hidden", cursor: "grab" }}
+        style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f9fafb", overflow: "hidden", cursor: "grab" }}
         onWheel={onWheel} onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
       >
         <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10000, display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ color: T_MUTED, fontSize: 11 }}>Scroll to zoom · Drag to pan</span>
+          <span style={{ color: "#9ca3af", fontSize: 11 }}>Scroll to zoom · Drag to pan</span>
           <button
             onClick={() => { setFullscreen(false); setScale(1); setTranslate({ x: 0, y: 0 }); }}
-            style={{ background: C_LEAF, border: "1px solid #334155", borderRadius: 8, padding: "8px 14px", color: T_WHITE, cursor: "pointer", fontSize: 13 }}
+            style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 14px", color: "#374151", cursor: "pointer", fontSize: 13 }}
           >
             ✕ Close
           </button>
@@ -267,13 +276,13 @@ export default function MindMap({ root, sections }: Props) {
   }
 
   return (
-    <div style={{ position: "relative", background: BG, borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ position: "relative", background: "#faf5ff", borderRadius: 12, overflow: "hidden", border: "1px solid #e9d5ff" }}>
       <button
         onClick={() => setFullscreen(true)}
         style={{
           position: "absolute", top: 12, right: 12, zIndex: 10,
-          background: C_LEAF, border: "1px solid #334155", borderRadius: 8,
-          padding: "6px 12px", color: T_MUTED, cursor: "pointer", fontSize: 12,
+          background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8,
+          padding: "6px 12px", color: "#7c3aed", cursor: "pointer", fontSize: 12, fontWeight: 500,
         }}
       >
         ⛶ Fullscreen
