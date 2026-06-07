@@ -252,8 +252,9 @@ export default function MindMap({ root, sections }: Props) {
   if (fullscreen) {
     return (
       <div
-        style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f9fafb", overflow: "hidden", cursor: "grab" }}
+        style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f9fafb", overflow: "hidden", cursor: "grab", userSelect: "none", touchAction: "none" }}
         onWheel={onWheel} onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+        onDoubleClick={(e) => e.preventDefault()}
       >
         <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10000, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ color: "#9ca3af", fontSize: 11 }}>Scroll to zoom · Drag to pan</span>
