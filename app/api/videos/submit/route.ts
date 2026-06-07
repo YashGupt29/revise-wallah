@@ -4,11 +4,14 @@
  * Flow:
  *  1. Validate URL
  *  2. Check cache
- *  3. Assert minutes
+ *  3. Assert sufficient minutes (blocks submission if balance is 0)
  *  4. Fetch transcript + metadata (from Next.js — not blocked by YouTube)
- *  5. Create job record + deduct minutes
+ *  5. Create job record
  *  6. Trigger Modal with transcript (Modal only runs LLM — no YouTube access)
  *  7. Return job_id
+ *
+ * Note: minutes are deducted on successful completion in GET /api/jobs/[id],
+ * not here. The upfront check only prevents submitting with zero balance.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,7 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeYouTubeUrl, hashUrl, isYouTubeUrl } from "@/lib/url";
 import { checkCache } from "@/lib/pipeline/cache";
-import { assertSufficientMinutes, deductMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
+import { assertSufficientMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
 import { triggerPipeline } from "@/lib/pipeline/modal";
 import { fetchTranscript } from "@/lib/pipeline/transcript";
 import { track } from "@/lib/mixpanel";
@@ -166,10 +169,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  // ── Deduct minutes (before pipeline — user has been charged) ─────────────
-  const newBalance = await deductMinutes(user.id, DEFAULT_MISS_COST, "processed");
-
   // ── Trigger Modal (fire-and-forget — transcript already fetched) ──────────
+  // Minutes are deducted on successful completion in GET /api/jobs/[id]
   triggerPipeline({
     jobId: job.id,
     youtubeUrl: normalizedUrl,
@@ -186,7 +187,7 @@ export async function POST(req: NextRequest) {
       .eq("id", job.id);
   });
 
-  track("pipeline_started", { job_id: job.id, url_hash: urlHash, minutes_cost: DEFAULT_MISS_COST, balance_after: newBalance });
+  track("pipeline_started", { job_id: job.id, url_hash: urlHash });
 
-  return NextResponse.json({ type: "job_created", job_id: job.id, minutes_remaining: newBalance }, { status: 202 });
+  return NextResponse.json({ type: "job_created", job_id: job.id }, { status: 202 });
 }
