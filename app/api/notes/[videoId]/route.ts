@@ -3,6 +3,11 @@
  *
  * Single responsibility: return all note formats for a processed video.
  * Enforces ownership — user must have a user_notes record for this video.
+ *
+ * DELETE /api/notes/[videoId]
+ *
+ * Removes the user's note (user_notes row). Does not delete the shared
+ * processed_video — other users may still have notes for the same video.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -66,4 +71,25 @@ export async function GET(
       raw_json: video.notes_json,
     },
   });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ videoId: string }> }
+) {
+  const { videoId } = await params;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { error } = await supabase
+    .from("user_notes")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("processed_video_id", videoId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ success: true });
 }

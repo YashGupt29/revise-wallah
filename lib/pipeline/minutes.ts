@@ -39,7 +39,7 @@ export async function assertSufficientMinutes(
 export async function deductMinutes(
   userId: string,
   amount: number,
-  reason: "processed" | "cache_hit" | "export" | "ai_chat",
+  reason: "processed" | "cache_hit" | "export" | "ai_chat" | "topup",
   processedVideoId?: string
 ): Promise<number> {
   const admin = createAdminClient();

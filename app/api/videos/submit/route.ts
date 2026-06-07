@@ -4,9 +4,9 @@
  * Flow:
  *  1. Validate URL
  *  2. Check cache
- *  3. [TESTING: minutes check disabled] Assert minutes
+ *  3. Assert minutes
  *  4. Fetch transcript + metadata (from Next.js — not blocked by YouTube)
- *  5. Create job record
+ *  5. Create job record + deduct minutes
  *  6. Trigger Modal with transcript (Modal only runs LLM — no YouTube access)
  *  7. Return job_id
  */
@@ -16,13 +16,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeYouTubeUrl, hashUrl, isYouTubeUrl } from "@/lib/url";
 import { checkCache } from "@/lib/pipeline/cache";
-// import { assertSufficientMinutes, deductMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
+import { assertSufficientMinutes, deductMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
 import { triggerPipeline } from "@/lib/pipeline/modal";
 import { fetchTranscript } from "@/lib/pipeline/transcript";
 import { track } from "@/lib/mixpanel";
 
-// const CACHE_HIT_COST = 5;
-// const DEFAULT_MISS_COST = 10;
+const CACHE_HIT_COST = 5;
+const DEFAULT_MISS_COST = 15;
 
 export async function POST(req: NextRequest) {
   // ── Auth ─────────────────────────────────────────────────────────────────
@@ -50,18 +50,17 @@ export async function POST(req: NextRequest) {
   const cached = await checkCache(urlHash);
 
   if (cached) {
-    // [TESTING: minutes check disabled]
-    // try {
-    //   await assertSufficientMinutes(user.id, CACHE_HIT_COST);
-    // } catch (err) {
-    //   if (err instanceof InsufficientMinutesError) {
-    //     return NextResponse.json(
-    //       { error: "Not enough minutes. Top up to continue.", code: "insufficient_minutes" },
-    //       { status: 402 }
-    //     );
-    //   }
-    //   throw err;
-    // }
+    try {
+      await assertSufficientMinutes(user.id, CACHE_HIT_COST);
+    } catch (err) {
+      if (err instanceof InsufficientMinutesError) {
+        return NextResponse.json(
+          { error: "Not enough minutes. Top up to continue.", code: "insufficient_minutes" },
+          { status: 402 }
+        );
+      }
+      throw err;
+    }
 
     const admin = createAdminClient();
     await admin.from("user_notes").upsert(
@@ -69,21 +68,21 @@ export async function POST(req: NextRequest) {
       { onConflict: "user_id,processed_video_id" }
     );
 
-    // const newBalance = await deductMinutes(user.id, CACHE_HIT_COST, "cache_hit", cached.processed_video_id);
+    const newBalance = await deductMinutes(user.id, CACHE_HIT_COST, "cache_hit", cached.processed_video_id);
 
     track("study_kit_generated", {
       cache_hit: true,
       duration_seconds: cached.duration_seconds,
       language: cached.language,
-      // minutes_cost: CACHE_HIT_COST,
-      // balance_after: newBalance,
+      minutes_cost: CACHE_HIT_COST,
+      balance_after: newBalance,
     });
 
     return NextResponse.json({
       type: "cache_hit",
       processed_video_id: cached.processed_video_id,
       title: cached.title,
-      // minutes_remaining: newBalance,
+      minutes_remaining: newBalance,
     });
   }
 
@@ -104,18 +103,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Assert minutes [TESTING: disabled] ────────────────────────────────────
-  // try {
-  //   await assertSufficientMinutes(user.id, DEFAULT_MISS_COST);
-  // } catch (err) {
-  //   if (err instanceof InsufficientMinutesError) {
-  //     return NextResponse.json(
-  //       { error: "Not enough minutes. Top up to continue.", code: "insufficient_minutes" },
-  //       { status: 402 }
-  //     );
-  //   }
-  //   throw err;
-  // }
+  // ── Assert minutes ────────────────────────────────────────────────────────
+  try {
+    await assertSufficientMinutes(user.id, DEFAULT_MISS_COST);
+  } catch (err) {
+    if (err instanceof InsufficientMinutesError) {
+      return NextResponse.json(
+        { error: "Not enough minutes. Top up to continue.", code: "insufficient_minutes" },
+        { status: 402 }
+      );
+    }
+    throw err;
+  }
 
   // ── Get video metadata via oEmbed ─────────────────────────────────────────
   let title = "";
@@ -167,6 +166,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
   }
 
+  // ── Deduct minutes (before pipeline — user has been charged) ─────────────
+  const newBalance = await deductMinutes(user.id, DEFAULT_MISS_COST, "processed");
+
   // ── Trigger Modal (fire-and-forget — transcript already fetched) ──────────
   triggerPipeline({
     jobId: job.id,
@@ -184,7 +186,7 @@ export async function POST(req: NextRequest) {
       .eq("id", job.id);
   });
 
-  track("pipeline_started", { job_id: job.id, url_hash: urlHash });
+  track("pipeline_started", { job_id: job.id, url_hash: urlHash, minutes_cost: DEFAULT_MISS_COST, balance_after: newBalance });
 
-  return NextResponse.json({ type: "job_created", job_id: job.id }, { status: 202 });
+  return NextResponse.json({ type: "job_created", job_id: job.id, minutes_remaining: newBalance }, { status: 202 });
 }

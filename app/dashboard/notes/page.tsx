@@ -1,14 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Star, BookOpen, Clock, Mic } from "lucide-react";
-
-function formatDuration(seconds?: number | null) {
-  if (!seconds) return "";
-  const m = Math.floor(seconds / 60);
-  const h = Math.floor(m / 60);
-  return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
-}
+import { Star, BookOpen } from "lucide-react";
+import NotesGrid from "@/components/NotesGrid";
 
 export default async function NotesLibraryPage() {
   const supabase = await createClient();
@@ -73,62 +67,7 @@ export default async function NotesLibraryPage() {
           </Link>
         </div>
       ) : (
-        /* Notes grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {allNotes.map((note) => {
-            const video = Array.isArray(note.processed_videos)
-              ? note.processed_videos[0]
-              : note.processed_videos;
-
-            const isDone = !video?.status || video.status === "done";
-            const duration = formatDuration(video?.duration_seconds);
-
-            return (
-              <Link
-                key={note.id}
-                href={`/dashboard/notes/${note.processed_video_id}`}
-                className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md hover:border-purple-200 transition-all block"
-              >
-                {/* Top row: language badge + star */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {video?.language && (
-                      <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full capitalize">
-                        {video.language}
-                      </span>
-                    )}
-                    {!isDone && (
-                      <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
-                        Processing...
-                      </span>
-                    )}
-                  </div>
-                  {note.is_starred && (
-                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0" />
-                  )}
-                </div>
-
-                {/* Title */}
-                <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-1 leading-snug">
-                  {video?.title ?? "Processing..."}
-                </h3>
-
-                {/* Channel */}
-                {video?.channel_name && (
-                  <p className="text-xs text-gray-400 mb-3 truncate">{video.channel_name}</p>
-                )}
-
-                {/* Duration */}
-                {duration && (
-                  <div className="flex items-center gap-1 text-xs text-gray-400">
-                    <Clock className="w-3 h-3" />
-                    <span>{duration}</span>
-                  </div>
-                )}
-              </Link>
-            );
-          })}
-        </div>
+        <NotesGrid initialNotes={allNotes as Parameters<typeof NotesGrid>[0]["initialNotes"]} />
       )}
     </div>
   );
