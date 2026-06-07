@@ -55,7 +55,8 @@ function formatDate(d: Date): string {
 }
 
 function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
+  const s = seconds > 100000 ? Math.floor(seconds / 1000) : seconds;
+  const m = Math.floor(s / 60);
   const h = Math.floor(m / 60);
   return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
 }

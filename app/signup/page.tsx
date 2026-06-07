@@ -6,10 +6,14 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { identify, setProfile, setSuperProperties, track } from "@/lib/mixpanel";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const refCode = searchParams.get("ref");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -49,7 +53,17 @@ export default function SignupPage() {
       setProfile({ email, name, plan: "free", createdAt: new Date().toISOString() });
       setSuperProperties({ platform: "web", plan_type: "free" });
     }
-    track("sign_up_completed", { sign_up_method: "email", platform: "web" });
+    track("sign_up_completed", { sign_up_method: "email", platform: "web", referred: !!refCode });
+
+    // Apply referral code if present (fire-and-forget — non-critical)
+    if (refCode) {
+      fetch("/api/referral/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: refCode }),
+      }).catch(() => {});
+    }
+
     setSuccess(true);
     setLoading(false);
   }
@@ -175,5 +189,13 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   );
 }

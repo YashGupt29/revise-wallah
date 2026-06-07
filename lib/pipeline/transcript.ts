@@ -19,7 +19,9 @@ const LANG_PRIORITY = ["en", "en-US", "en-GB", "en-IN", "hi", "hi-IN"];
 function calcDuration(entries: { offset: number; duration: number }[]): number {
   if (!entries.length) return 0;
   const last = entries[entries.length - 1];
-  return Math.round(last.offset + last.duration);
+  const raw = last.offset + last.duration;
+  // youtube-transcript returns values in milliseconds — convert to seconds
+  return Math.round(raw > 10000 ? raw / 1000 : raw);
 }
 
 export async function fetchTranscript(youtubeUrl: string): Promise<TranscriptResult> {

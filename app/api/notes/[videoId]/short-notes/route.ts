@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { planHasFeature } from "@/lib/plan/features";
 
 const SHORT_NOTES_SYSTEM = `You are ReviseAI. Generate an ultra-concise, domain-aware cheat sheet from structured lecture notes.
 Output ONLY valid JSON. No markdown fences, no explanation.`;
@@ -69,6 +70,20 @@ export async function GET(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Plan gate: short notes are Pro only
+  const { data: profile } = await supabase
+    .from("users")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+
+  if (!planHasFeature(profile?.plan, "short_notes")) {
+    return NextResponse.json(
+      { error: "Short notes are available on the Pro plan.", code: "plan_required", required_plan: "pro" },
+      { status: 403 }
+    );
+  }
 
   // Verify ownership
   const { data: note } = await supabase

@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeYouTubeUrl, hashUrl, isYouTubeUrl } from "@/lib/url";
 import { checkCache } from "@/lib/pipeline/cache";
-import { assertSufficientMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
+import { assertSufficientMinutes, deductMinutes, InsufficientMinutesError } from "@/lib/pipeline/minutes";
 import { triggerPipeline } from "@/lib/pipeline/modal";
 import { fetchTranscript } from "@/lib/pipeline/transcript";
 import { track } from "@/lib/mixpanel";

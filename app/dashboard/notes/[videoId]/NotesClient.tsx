@@ -8,6 +8,8 @@ import HandwrittenNotes from "@/components/HandwrittenNotes";
 import MindMap from "@/components/MindMap";
 import ShortNotes from "@/components/ShortNotes";
 import clsx from "clsx";
+import { planHasFeature, FEATURE_MIN_PLAN, type Plan } from "@/lib/plan/features";
+import { Lock } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +78,7 @@ interface Video {
 interface Props {
   video: Video;
   isStarred: boolean;
+  userPlan: Plan;
 }
 
 type Tab = "notes" | "flashcards" | "quiz" | "handwritten" | "mindmap" | "shortnotes";
@@ -84,7 +87,8 @@ type Tab = "notes" | "flashcards" | "quiz" | "handwritten" | "mindmap" | "shortn
 
 function formatDuration(seconds?: number) {
   if (!seconds) return "";
-  const m = Math.floor(seconds / 60);
+  const s = seconds > 100000 ? Math.floor(seconds / 1000) : seconds; // stored as ms in some rows
+  const m = Math.floor(s / 60);
   const h = Math.floor(m / 60);
   return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
 }
@@ -422,7 +426,7 @@ function QuizTab({ questions }: { questions: QuizQuestion[] }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function NotesClient({ video, isStarred }: Props) {
+export default function NotesClient({ video, isStarred, userPlan }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("notes");
   const [starred, setStarred] = useState(isStarred);
@@ -463,13 +467,14 @@ export default function NotesClient({ video, isStarred }: Props) {
   const flashcards = video.flashcards_json ?? [];
   const quiz = video.quiz_json ?? [];
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
+  type TabDef = { id: Tab; label: string; icon: React.ReactNode; count?: number; feature?: Parameters<typeof planHasFeature>[1] };
+  const tabs: TabDef[] = [
     { id: "notes", label: "Notes", icon: <BookOpen className="w-4 h-4" /> },
-    { id: "flashcards", label: "Flashcards", icon: <Zap className="w-4 h-4" />, count: flashcards.length },
-    { id: "quiz", label: "Quiz", icon: <HelpCircle className="w-4 h-4" />, count: quiz.length },
-    { id: "handwritten", label: "Handwritten", icon: <PenLine className="w-4 h-4" /> },
-    { id: "mindmap", label: "Mind Map", icon: <Network className="w-4 h-4" /> },
-    { id: "shortnotes", label: "Short Notes", icon: <FileText className="w-4 h-4" /> },
+    { id: "flashcards", label: "Flashcards", icon: <Zap className="w-4 h-4" />, count: flashcards.length, feature: "flashcards" },
+    { id: "quiz", label: "Quiz", icon: <HelpCircle className="w-4 h-4" />, count: quiz.length, feature: "quiz" },
+    { id: "handwritten", label: "Handwritten", icon: <PenLine className="w-4 h-4" />, feature: "handwritten_notes" },
+    { id: "mindmap", label: "Mind Map", icon: <Network className="w-4 h-4" />, feature: "mindmap" },
+    { id: "shortnotes", label: "Short Notes", icon: <FileText className="w-4 h-4" />, feature: "short_notes" },
   ];
 
   function exportPdf() {
@@ -584,33 +589,49 @@ export default function NotesClient({ video, isStarred }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => {
-              setTab(t.id);
-              track("notes_tab_switched", { tab: t.id, video_id: video.id });
-            }}
-            className={clsx(
-              "flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-colors",
-              tab === t.id
-                ? "bg-white text-purple-700 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            )}
-          >
-            {t.icon}
-            {t.label}
-            {t.count !== undefined && t.count > 0 && (
-              <span className={clsx(
-                "text-xs px-1.5 py-0.5 rounded-full",
-                tab === t.id ? "bg-purple-100 text-purple-600" : "bg-gray-200 text-gray-500"
-              )}>
-                {t.count}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 flex-wrap">
+        {tabs.map((t) => {
+          const locked = !!t.feature && !planHasFeature(userPlan, t.feature);
+          const requiredPlan = t.feature ? FEATURE_MIN_PLAN[t.feature] : undefined;
+          return (
+            <button
+              key={t.id}
+              onClick={() => {
+                if (locked) {
+                  router.push("/dashboard/upgrade");
+                  return;
+                }
+                setTab(t.id);
+                track("notes_tab_switched", { tab: t.id, video_id: video.id });
+              }}
+              title={locked ? `Upgrade to ${requiredPlan} plan` : undefined}
+              className={clsx(
+                "flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-colors min-w-fit",
+                locked
+                  ? "text-gray-400 cursor-pointer hover:text-gray-600"
+                  : tab === t.id
+                  ? "bg-white text-purple-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              {locked ? <Lock className="w-3.5 h-3.5" /> : t.icon}
+              {t.label}
+              {locked && requiredPlan && (
+                <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold capitalize">
+                  {requiredPlan}+
+                </span>
+              )}
+              {!locked && t.count !== undefined && t.count > 0 && (
+                <span className={clsx(
+                  "text-xs px-1.5 py-0.5 rounded-full",
+                  tab === t.id ? "bg-purple-100 text-purple-600" : "bg-gray-200 text-gray-500"
+                )}>
+                  {t.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Export button — notes, handwritten, short notes */}

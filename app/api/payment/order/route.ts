@@ -1,22 +1,17 @@
 /**
  * POST /api/payment/order
  *
- * Creates a Razorpay order for a minutes package.
- * Returns { orderId, amount, currency, keyId } to the client.
+ * Creates a Razorpay order for a monthly plan purchase.
+ * Free plan has no payment — this route only handles paid plans.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Razorpay from "razorpay";
+import { PLANS, type Plan } from "@/lib/plan/features";
 
-// Minutes packages available for purchase
-export const PACKAGES = [
-  { id: "starter", label: "Starter", minutes: 100, priceInr: 99 },
-  { id: "popular", label: "Popular", minutes: 300, priceInr: 249 },
-  { id: "pro", label: "Pro", minutes: 1000, priceInr: 699 },
-] as const;
-
-type PackageId = (typeof PACKAGES)[number]["id"];
+// Only paid plans go through checkout
+export const PAID_PLANS = PLANS.filter((p) => p.priceInr > 0);
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -24,31 +19,26 @@ const razorpay = new Razorpay({
 });
 
 export async function POST(req: NextRequest) {
-  // ── Auth ───────────────────────────────────────────────────────────────────
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // ── Input validation ───────────────────────────────────────────────────────
   const body = await req.json().catch(() => ({}));
-  const packageId: PackageId = body.packageId;
-  const pkg = PACKAGES.find((p) => p.id === packageId);
+  const planId: Plan = body.planId;
+  const plan = PAID_PLANS.find((p) => p.id === planId);
 
-  if (!pkg) {
-    return NextResponse.json({ error: "Invalid package" }, { status: 400 });
+  if (!plan) {
+    return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
-  // ── Create Razorpay order ──────────────────────────────────────────────────
   const order = await razorpay.orders.create({
-    amount: pkg.priceInr * 100, // Razorpay expects paise (1 INR = 100 paise)
+    amount: plan.priceInr * 100,
     currency: "INR",
-    receipt: `uid_${user.id.slice(0, 8)}_pkg_${packageId}`,
+    receipt: `uid_${user.id.slice(0, 8)}_plan_${planId}`,
     notes: {
       user_id: user.id,
-      package_id: packageId,
-      minutes: String(pkg.minutes),
+      plan_id: planId,
+      minutes: String(plan.minutesPerMonth),
     },
   });
 
@@ -57,6 +47,6 @@ export async function POST(req: NextRequest) {
     amount: order.amount,
     currency: order.currency,
     keyId: process.env.RAZORPAY_KEY_ID,
-    package: pkg,
+    plan,
   });
 }
