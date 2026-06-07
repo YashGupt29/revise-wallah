@@ -107,9 +107,26 @@ function MNode({ x, y, w, h, text, bg, color, stroke, fontSize, bold, rx = 10 }:
   );
 }
 
+// ── Canvas dimension helper ────────────────────────────────────────────────────
+
+function computeCanvasDims(sections: Section[]) {
+  const n = sections.length;
+  const left = sections.slice(0, Math.ceil(n / 2));
+  const right = sections.slice(Math.ceil(n / 2));
+  const leftInfo = left.map(groupInfo);
+  const rightInfo = right.map(groupInfo);
+  const totalH = (infos: ReturnType<typeof groupInfo>[]) =>
+    infos.reduce((a, g) => a + g.groupH, 0) + BRANCH_GAP * Math.max(0, infos.length - 1);
+  const leftH = totalH(leftInfo);
+  const rightH = totalH(rightInfo);
+  const canvasH = Math.max(leftH, rightH, CH + 40) + CANVAS_PAD * 2;
+  const canvasW = CANVAS_PAD * 2 + LW * 2 + H_BL * 2 + BW * 2 + H_CB * 2 + CW;
+  return { canvasW, canvasH };
+}
+
 // ── SVG renderer ──────────────────────────────────────────────────────────────
 
-function MindMapSVG({ root, sections }: Props) {
+function MindMapSVG({ root, sections, naturalSize }: Props & { naturalSize?: boolean }) {
   const n = sections.length;
   const left = sections.slice(0, Math.ceil(n / 2));
   const right = sections.slice(Math.ceil(n / 2));
@@ -203,7 +220,8 @@ function MindMapSVG({ root, sections }: Props) {
   return (
     <svg
       viewBox={`0 0 ${canvasW} ${canvasH}`}
-      width="100%"
+      width={naturalSize ? canvasW : "100%"}
+      height={naturalSize ? canvasH : undefined}
       style={{ display: "block", background: BG }}
     >
       {lines}
@@ -234,6 +252,18 @@ export default function MindMap({ root, sections }: Props) {
     );
   }
 
+  const { canvasW, canvasH } = computeCanvasDims(sections);
+
+  const openFullscreen = () => {
+    const iScale = Math.min(
+      (window.innerWidth - 40) / canvasW,
+      (window.innerHeight - 40) / canvasH
+    ) * 0.9;
+    setScale(iScale);
+    setTranslate({ x: 0, y: 0 });
+    setFullscreen(true);
+  };
+
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     setScale(s => Math.min(3, Math.max(0.2, s - e.deltaY * 0.001)));
@@ -247,7 +277,8 @@ export default function MindMap({ root, sections }: Props) {
   };
   const onUp = () => { drag.current = null; };
 
-  const map = <MindMapSVG root={root} sections={sections} />;
+  const previewMap = <MindMapSVG root={root} sections={sections} />;
+  const fullMap = <MindMapSVG root={root} sections={sections} naturalSize />;
 
   if (fullscreen) {
     return (
@@ -269,7 +300,8 @@ export default function MindMap({ root, sections }: Props) {
           });
         }}
       >
-        <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10000, display: "flex", alignItems: "center", gap: 10 }}>
+        {/* Fixed controls — always visible regardless of zoom */}
+        <div style={{ position: "fixed", top: 16, right: 16, zIndex: 10000, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ color: "#9ca3af", fontSize: 11 }}>Scroll to zoom · Drag to pan</span>
           <button
             onClick={() => { setFullscreen(false); setScale(1); setTranslate({ x: 0, y: 0 }); }}
@@ -283,7 +315,7 @@ export default function MindMap({ root, sections }: Props) {
           transformOrigin: "center center",
           position: "absolute", top: "50%", left: "50%",
         }}>
-          {map}
+          {fullMap}
         </div>
       </div>
     );
@@ -291,13 +323,13 @@ export default function MindMap({ root, sections }: Props) {
 
   return (
     <div
-      onClick={() => setFullscreen(true)}
+      onClick={openFullscreen}
       style={{ position: "relative", background: "#faf5ff", borderRadius: 12, overflow: "hidden", border: "1px solid #e9d5ff", cursor: "zoom-in" }}
     >
       <div style={{ position: "absolute", top: 12, right: 12, zIndex: 10, background: "#fff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "6px 12px", color: "#7c3aed", fontSize: 12, fontWeight: 500, pointerEvents: "none" }}>
         ⛶ Fullscreen
       </div>
-      {map}
+      {previewMap}
     </div>
   );
 }

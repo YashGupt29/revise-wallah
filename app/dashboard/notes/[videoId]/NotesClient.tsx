@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { track } from "@/lib/mixpanel";
 import { ArrowLeft, Star, BookOpen, Zap, HelpCircle, ExternalLink, PenLine, Download, Network, FileText } from "lucide-react";
@@ -19,6 +19,8 @@ interface NoteSection {
   definitions?: string[];
   examples?: string[];
   exam_tips?: string[];
+  code_snippets?: { language: string; code: string }[];
+  real_world_examples?: string[];
 }
 
 interface NotesJson {
@@ -168,11 +170,38 @@ function NotesTab({ notes }: { notes: NotesJson }) {
           )}
 
           {section.exam_tips && section.exam_tips.length > 0 && (
-            <div>
+            <div className="mb-4">
               <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-2">Exam Tips</p>
               <div className="space-y-1">
                 {section.exam_tips.map((t, j) => (
                   <p key={j} className="text-sm text-gray-700 bg-purple-50 rounded-lg px-3 py-2">💡 {t}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {section.code_snippets && section.code_snippets.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">💻 Code</p>
+              <div className="space-y-2">
+                {section.code_snippets.map((snippet, j) => (
+                  <div key={j} className="rounded-lg overflow-hidden border border-gray-200">
+                    <div className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 border-b border-gray-200">
+                      {snippet.language === "cpp" ? "C++" : snippet.language.charAt(0).toUpperCase() + snippet.language.slice(1)}
+                    </div>
+                    <pre className="text-xs text-gray-800 bg-gray-50 px-4 py-3 overflow-x-auto font-mono leading-relaxed">{snippet.code}</pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {section.real_world_examples && section.real_world_examples.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-sky-500 uppercase tracking-wider mb-2">🌍 Real-world Examples</p>
+              <div className="space-y-1">
+                {section.real_world_examples.map((ex, j) => (
+                  <p key={j} className="text-sm text-sky-900 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">{ex}</p>
                 ))}
               </div>
             </div>
@@ -397,6 +426,30 @@ export default function NotesClient({ video, isStarred }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("notes");
   const [starred, setStarred] = useState(isStarred);
+  const [shortNotes, setShortNotes] = useState<ShortNotesData | null>(video.short_notes_json ?? null);
+  const [shortNotesLoading, setShortNotesLoading] = useState(false);
+  const [shortNotesError, setShortNotesError] = useState(false);
+  const shortNotesFetched = useRef(!!video.short_notes_json);
+
+  const fetchShortNotes = () => {
+    shortNotesFetched.current = true;
+    setShortNotesLoading(true);
+    setShortNotesError(false);
+    fetch(`/api/notes/${video.id}/short-notes`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.short_notes) setShortNotes(data.short_notes);
+        else setShortNotesError(true);
+      })
+      .catch(() => setShortNotesError(true))
+      .finally(() => setShortNotesLoading(false));
+  };
+
+  // Lazy-generate short notes on first tab open
+  useEffect(() => {
+    if (tab !== "shortnotes" || shortNotesFetched.current) return;
+    fetchShortNotes();
+  }, [tab, video.id]);
 
   // notes_json stores the full GeneratedContent object; the notes sub-key holds summary/sections
   const rawJson = video.notes_json as (NotesJson & { notes?: NotesJson }) | null;
@@ -424,6 +477,11 @@ export default function NotesClient({ video, isStarred }: Props) {
 
     if (tab === "handwritten") {
       window.open(`/print/notes/${video.id}`, "_blank");
+      return;
+    }
+
+    if (tab === "shortnotes") {
+      window.open(`/print/notes/${video.id}/short-notes`, "_blank");
       return;
     }
 
@@ -463,7 +521,7 @@ export default function NotesClient({ video, isStarred }: Props) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <button
@@ -555,8 +613,8 @@ export default function NotesClient({ video, isStarred }: Props) {
         ))}
       </div>
 
-      {/* Export button — only for notes + handwritten */}
-      {(tab === "notes" || tab === "handwritten") && (
+      {/* Export button — notes, handwritten, short notes */}
+      {(tab === "notes" || tab === "handwritten" || (tab === "shortnotes" && shortNotes)) && (
         <div className="flex justify-end mb-4">
           <button
             onClick={exportPdf}
@@ -603,14 +661,24 @@ export default function NotesClient({ video, isStarred }: Props) {
       )}
 
       {tab === "shortnotes" && (
-        video.short_notes_json ? (
-          <ShortNotes data={video.short_notes_json as any} />
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-gray-400 text-sm">Short notes not yet generated for this video.</p>
-            <p className="text-xs text-gray-300 mt-1">Re-submit the video URL to generate short notes.</p>
+        shortNotesLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <div className="w-7 h-7 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-gray-400">Generating short notes…</p>
           </div>
-        )
+        ) : shortNotesError ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <p className="text-sm text-gray-500">Failed to generate short notes.</p>
+            <button
+              onClick={() => { shortNotesFetched.current = false; fetchShortNotes(); }}
+              className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : shortNotes ? (
+          <ShortNotes data={shortNotes as any} />
+        ) : null
       )}
     </div>
   );

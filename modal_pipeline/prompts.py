@@ -308,6 +308,37 @@ COMPLETE JSON SCHEMA WITH FIELD DOCUMENTATION
             "This derivation appears in JEE Advanced almost every year — memorise each step"
             "NEET 2023 had a question on this exact scenario — work backwards from options"
           Leave [] if teacher did not flag exam relevance.
+
+        "code_snippets": [object]
+          MANDATORY for CS / DSA / Programming / Software Engineering lectures.
+          Leave [] for all other subjects.
+          Each entry: {{ "language": "python"|"java"|"cpp", "code": "..." }}
+          Rules:
+            - Always include all three languages: python, java, cpp
+            - Code must be complete and runnable — no pseudocode, no "..."
+            - Include the core algorithm / pattern taught in this section
+            - Keep each snippet concise (≤30 lines) — focus on the key logic
+            - Add 1-2 inline comments only where the logic is non-obvious
+          Examples of when to include:
+            Sorting algorithms, graph traversal, DP patterns, binary search,
+            OOP concepts with class examples, data structure implementations.
+
+        "real_world_examples": [string]
+          Concrete real-world scenarios that illustrate the concept.
+          MANDATORY when the lecture is conceptual / explanation-heavy (any subject).
+          Leave [] only if the section is purely derivation or calculation.
+          Rules:
+            - Must be actual real-world scenarios, NOT analogies or metaphors
+            - Each example ≤25 words
+            - Name the specific system, product, or phenomenon
+          Good examples:
+            "GPS uses Dijkstra's algorithm to compute the shortest driving route in real time"
+            "Instagram's feed ranking uses gradient descent to optimise engagement prediction"
+            "Bernoulli's principle explains why airplane wings generate lift at high speeds"
+          Bad examples (too vague or analogous):
+            "It's like water flowing downhill"
+            "Think of it as a bucket"
+          Leave [] if section is pure calculation/derivation with no conceptual content.
       }}
     ]
   }}

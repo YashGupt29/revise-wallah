@@ -16,6 +16,8 @@ interface NoteSection {
   definitions?: string[];
   examples?: string[];
   exam_tips?: string[];
+  code_snippets?: { language: string; code: string }[];
+  real_world_examples?: string[];
 }
 
 interface NotesJson {
@@ -482,6 +484,37 @@ export default function HandwrittenNotes({
 
               {section.exam_tips && section.exam_tips.length > 0 && (
                 <ExamTipList items={section.exam_tips} />
+              )}
+
+              {section.real_world_examples && section.real_world_examples.length > 0 && (
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{ fontWeight: 700, color: "#0c4a6e", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
+                    🌍 Real-world Examples
+                  </div>
+                  {section.real_world_examples.map((ex, j) => (
+                    <div key={j} style={{ borderLeft: "2px solid #38bdf8", paddingLeft: "10px", marginBottom: "4px", color: "#0c4a6e", fontSize: "0.95rem", lineHeight: 1.6 }}>
+                      {ex}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {section.code_snippets && section.code_snippets.length > 0 && (
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
+                    💻 Code
+                  </div>
+                  {section.code_snippets.map((snippet, j) => (
+                    <div key={j} style={{ marginBottom: "8px", border: "1px solid #e5e7eb", borderRadius: "6px", overflow: "hidden" }}>
+                      <div style={{ background: "#f3f4f6", padding: "3px 10px", fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", borderBottom: "1px solid #e5e7eb" }}>
+                        {snippet.language === "cpp" ? "C++" : snippet.language.charAt(0).toUpperCase() + snippet.language.slice(1)}
+                      </div>
+                      <pre style={{ margin: 0, padding: "8px 12px", background: "#fafafa", fontSize: "0.75rem", fontFamily: "monospace", lineHeight: 1.6, overflowX: "auto", color: "#1f2937" }}>
+                        {snippet.code}
+                      </pre>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           ))}

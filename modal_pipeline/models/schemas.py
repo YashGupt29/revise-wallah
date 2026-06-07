@@ -26,6 +26,8 @@ class NoteSection(BaseModel):
     definitions: list[str] = []
     examples: list[str] = []
     exam_tips: list[str] = []
+    code_snippets: list[dict] = []      # [{"language": "python"|"java"|"cpp", "code": "..."}]
+    real_world_examples: list[str] = [] # concrete real-world scenarios, no analogies
 
 
 class Notes(BaseModel):
