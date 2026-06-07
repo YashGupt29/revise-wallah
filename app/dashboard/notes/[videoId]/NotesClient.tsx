@@ -402,7 +402,11 @@ export default function NotesClient({ video, isStarred }: Props) {
   const rawJson = video.notes_json as (NotesJson & { notes?: NotesJson }) | null;
   const notes: NotesJson | null = rawJson?.notes ?? rawJson ?? null;
   const generatedContent = rawJson as any;
-  const mindMapData = (rawJson as any)?.mind_map ?? null;
+  const mindMapRoot = (rawJson as any)?.mind_map?.root ?? video.title ?? "Mind Map";
+  const mindMapSections = (notes?.sections ?? []).map((s: any) => ({
+    heading: s.heading ?? "",
+    bullets: s.bullets ?? [],
+  }));
   const flashcards = video.flashcards_json ?? [];
   const quiz = video.quiz_json ?? [];
 
@@ -594,13 +598,8 @@ export default function NotesClient({ video, isStarred }: Props) {
         <div className="text-center py-20 text-gray-400">Handwritten notes not available.</div>
       )}
 
-      {tab === "mindmap" && mindMapData && (
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-          <MindMap data={mindMapData} />
-        </div>
-      )}
-      {tab === "mindmap" && !mindMapData && (
-        <div className="text-center py-20 text-gray-400">No mind map data available for this video.</div>
+      {tab === "mindmap" && (
+        <MindMap root={mindMapRoot} sections={mindMapSections} />
       )}
 
       {tab === "shortnotes" && (

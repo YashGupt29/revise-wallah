@@ -1,120 +1,223 @@
 "use client";
 
-interface MindMapChild {
-  label: string;
-  leaf?: boolean;
-}
+import { useState, useRef } from "react";
 
-interface MindMapBranch {
-  label: string;
-  children: MindMapChild[];
-}
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-interface MindMapData {
-  root: string;
-  branches: MindMapBranch[];
+interface Section {
+  heading: string;
+  bullets: string[];
 }
 
 interface Props {
-  data: MindMapData;
+  root: string;
+  sections: Section[];
 }
 
-const CX = 500;
-const CY = 480;
-const SECTION_RADIUS = 220;
-const BULLET_RADIUS = 200;
-const MAX_BULLETS = 2;
+// ── Layout constants ──────────────────────────────────────────────────────────
 
-// Leaf box dimensions — must satisfy: 2 * BULLET_RADIUS * sin(spread/2) > LEAF_W + padding
-const LEAF_W = 120;
-const LEAF_H = 65;
+const CW = 180;      // center node width
+const CH = 64;       // center node height
+const BW = 220;      // branch node width
+const BH = 52;       // branch node height
+const LW = 260;      // leaf node width
+const L_FONT = 11;   // leaf font size (px)
+const L_LINE = 17;   // leaf line height (px)
+const L_PAD = 14;    // leaf vertical padding (px)
+const LEAF_GAP = 12; // gap between sibling leaves
+const BRANCH_GAP = 40; // gap between branch groups
+const H_CB = 80;     // horiz gap: center → branch
+const H_BL = 56;     // horiz gap: branch → leaf
+const CANVAS_PAD = 60;
 
-// Compute (x, y) from center at angle (radians) and distance
-function polar(cx: number, cy: number, angle: number, r: number): [number, number] {
-  return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+// ── Colors ────────────────────────────────────────────────────────────────────
+
+const BG = "#0f172a";
+const C_CENTER = "#1d4ed8";
+const C_BRANCH = "#1e3a5f";
+const C_LEAF = "#1e293b";
+const T_WHITE = "#f1f5f9";
+const T_MUTED = "#94a3b8";
+const C_LINE = "#3b82f6";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Estimate rendered height of a leaf node based on text length */
+function leafHeight(text: string): number {
+  const charsPerLine = Math.floor((LW - 20) / (L_FONT * 0.58));
+  const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+  return lines * L_LINE + L_PAD * 2;
 }
 
-// Cubic bezier path string between two points, curving slightly
-function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
+/** Group info for a single section */
+function groupInfo(section: Section) {
+  const heights = section.bullets.map(leafHeight);
+  const totalLeaf = heights.reduce((a, b) => a + b, 0) + LEAF_GAP * Math.max(0, heights.length - 1);
+  return { heights, totalLeaf, groupH: Math.max(BH + 16, totalLeaf) };
+}
+
+/** S-curve bezier between two points (horizontal bias) */
+function sCurve(x1: number, y1: number, x2: number, y2: number, key: string) {
   const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-  return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
-}
-
-interface NodeBoxProps {
-  x: number;
-  y: number;
-  text: string;
-  fill: string;
-  textColor: string;
-  width: number;
-  height: number;
-  rx?: number;
-  fontSize?: number;
-  fontWeight?: string;
-}
-
-function NodeBox({
-  x,
-  y,
-  text,
-  fill,
-  textColor,
-  width,
-  height,
-  rx = 10,
-  fontSize = 12,
-  fontWeight = "normal",
-}: NodeBoxProps) {
-  const fo = (
-    <foreignObject
-      x={x - width / 2}
-      y={y - height / 2}
-      width={width}
-      height={height}
-      style={{ overflow: "visible" }}
-    >
-      {/* @ts-ignore: xmlns required for SVG foreignObject */}
-      <div
-        xmlns="http://www.w3.org/1999/xhtml"
-        style={{
-          width: `${width}px`,
-          height: `${height}px`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-          fontSize: `${fontSize}px`,
-          fontWeight,
-          color: textColor,
-          padding: "4px 6px",
-          boxSizing: "border-box",
-          wordBreak: "break-word",
-          lineHeight: 1.3,
-        }}
-      >
-        {text}
-      </div>
-    </foreignObject>
+  return (
+    <path
+      key={key}
+      d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
+      fill="none"
+      stroke={C_LINE}
+      strokeWidth={1.5}
+      opacity={0.65}
+    />
   );
+}
 
+// ── Node component ────────────────────────────────────────────────────────────
+
+interface NodeProps {
+  x: number; y: number; w: number; h: number;
+  text: string; bg: string; color: string;
+  fontSize: number; bold?: boolean; rx?: number;
+}
+
+function MNode({ x, y, w, h, text, bg, color, fontSize, bold, rx = 10 }: NodeProps) {
   return (
     <g>
-      <rect
-        x={x - width / 2}
-        y={y - height / 2}
-        width={width}
-        height={height}
-        rx={rx}
-        fill={fill}
-      />
-      {fo}
+      <rect x={x} y={y - h / 2} width={w} height={h} rx={rx} fill={bg} />
+      <foreignObject x={x + 8} y={y - h / 2 + L_PAD / 2} width={w - 16} height={h - L_PAD}>
+        {/* @ts-ignore */}
+        <div
+          xmlns="http://www.w3.org/1999/xhtml"
+          style={{
+            color,
+            fontSize,
+            fontWeight: bold ? 600 : 400,
+            lineHeight: `${L_LINE}px`,
+            wordBreak: "break-word",
+          }}
+        >
+          {text}
+        </div>
+      </foreignObject>
     </g>
   );
 }
 
-export default function MindMap({ data }: Props) {
-  if (!data || !data.branches || data.branches.length === 0) {
+// ── SVG renderer ──────────────────────────────────────────────────────────────
+
+function MindMapSVG({ root, sections }: Props) {
+  const n = sections.length;
+  const left = sections.slice(0, Math.ceil(n / 2));
+  const right = sections.slice(Math.ceil(n / 2));
+
+  const leftInfo = left.map(groupInfo);
+  const rightInfo = right.map(groupInfo);
+
+  const totalH = (infos: ReturnType<typeof groupInfo>[]) =>
+    infos.reduce((a, g) => a + g.groupH, 0) + BRANCH_GAP * Math.max(0, infos.length - 1);
+
+  const leftH = totalH(leftInfo);
+  const rightH = totalH(rightInfo);
+  const canvasH = Math.max(leftH, rightH, CH + 40) + CANVAS_PAD * 2;
+  const canvasW = CANVAS_PAD * 2 + LW * 2 + H_BL * 2 + BW * 2 + H_CB * 2 + CW;
+
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
+
+  // X anchor points
+  const cLeft = cx - CW / 2;
+  const cRight = cx + CW / 2;
+  const lBranchR = cLeft - H_CB;
+  const lBranchL = lBranchR - BW;
+  const lLeafR = lBranchL - H_BL;
+  const lLeafL = lLeafR - LW;
+  const rBranchL = cRight + H_CB;
+  const rBranchR = rBranchL + BW;
+  const rLeafL = rBranchR + H_BL;
+
+  const lines: React.ReactNode[] = [];
+  const nodes: React.ReactNode[] = [];
+
+  // LEFT
+  let curY = cy - leftH / 2;
+  left.forEach((section, bi) => {
+    const info = leftInfo[bi];
+    const bY = curY + info.groupH / 2;
+
+    lines.push(sCurve(cLeft, cy, lBranchR, bY, `lc-${bi}`));
+    nodes.push(
+      <MNode key={`lb-${bi}`} x={lBranchL} y={bY} w={BW} h={BH}
+        text={section.heading} bg={C_BRANCH} color={T_WHITE} fontSize={11} bold />
+    );
+
+    let leafY = bY - info.totalLeaf / 2;
+    section.bullets.forEach((bullet, ci) => {
+      const lh = info.heights[ci];
+      const lmY = leafY + lh / 2;
+      lines.push(sCurve(lBranchL, bY, lLeafR, lmY, `ll-${bi}-${ci}`));
+      nodes.push(
+        <MNode key={`llf-${bi}-${ci}`} x={lLeafL} y={lmY} w={LW} h={lh}
+          text={bullet} bg={C_LEAF} color={T_MUTED} fontSize={L_FONT} rx={8} />
+      );
+      leafY += lh + LEAF_GAP;
+    });
+
+    curY += info.groupH + BRANCH_GAP;
+  });
+
+  // RIGHT
+  curY = cy - rightH / 2;
+  right.forEach((section, bi) => {
+    const info = rightInfo[bi];
+    const bY = curY + info.groupH / 2;
+
+    lines.push(sCurve(cRight, cy, rBranchL, bY, `rc-${bi}`));
+    nodes.push(
+      <MNode key={`rb-${bi}`} x={rBranchL} y={bY} w={BW} h={BH}
+        text={section.heading} bg={C_BRANCH} color={T_WHITE} fontSize={11} bold />
+    );
+
+    let leafY = bY - info.totalLeaf / 2;
+    section.bullets.forEach((bullet, ci) => {
+      const lh = info.heights[ci];
+      const lmY = leafY + lh / 2;
+      lines.push(sCurve(rBranchR, bY, rLeafL, lmY, `rl-${bi}-${ci}`));
+      nodes.push(
+        <MNode key={`rlf-${bi}-${ci}`} x={rLeafL} y={lmY} w={LW} h={lh}
+          text={bullet} bg={C_LEAF} color={T_MUTED} fontSize={L_FONT} rx={8} />
+      );
+      leafY += lh + LEAF_GAP;
+    });
+
+    curY += info.groupH + BRANCH_GAP;
+  });
+
+  return (
+    <svg
+      viewBox={`0 0 ${canvasW} ${canvasH}`}
+      width={canvasW}
+      style={{ display: "block", background: BG, minWidth: canvasW }}
+    >
+      {lines}
+      {nodes}
+      {/* Center node rendered last → always on top */}
+      <MNode
+        x={cLeft} y={cy} w={CW} h={CH}
+        text={root} bg={C_CENTER} color="#ffffff"
+        fontSize={13} bold rx={32}
+      />
+    </svg>
+  );
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
+export default function MindMap({ root, sections }: Props) {
+  const [fullscreen, setFullscreen] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const drag = useRef<{ sx: number; sy: number; tx: number; ty: number } | null>(null);
+
+  if (!sections || sections.length === 0) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
         No mind map data available.
@@ -122,125 +225,62 @@ export default function MindMap({ data }: Props) {
     );
   }
 
-  const branches = data.branches;
-  const branchCount = branches.length;
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    setScale(s => Math.min(3, Math.max(0.2, s - e.deltaY * 0.001)));
+  };
+  const onDown = (e: React.MouseEvent) => {
+    drag.current = { sx: e.clientX, sy: e.clientY, tx: translate.x, ty: translate.y };
+  };
+  const onMove = (e: React.MouseEvent) => {
+    if (!drag.current) return;
+    setTranslate({ x: drag.current.tx + e.clientX - drag.current.sx, y: drag.current.ty + e.clientY - drag.current.sy });
+  };
+  const onUp = () => { drag.current = null; };
 
-  // Precompute branch angles spread evenly around the circle
-  const branchAngles = branches.map((_, i) => (2 * Math.PI * i) / branchCount - Math.PI / 2);
+  const map = <MindMapSVG root={root} sections={sections} />;
 
-  const lines: React.ReactNode[] = [];
-  const nodes: React.ReactNode[] = [];
-
-  branches.forEach((branch, si) => {
-    const angle = branchAngles[si];
-    const [sx, sy] = polar(CX, CY, angle, SECTION_RADIUS);
-
-    // Line: center → branch
-    lines.push(
-      <path
-        key={`line-center-${si}`}
-        d={bezierPath(CX, CY, sx, sy)}
-        stroke="#7c3aed"
-        strokeWidth={2}
-        fill="none"
-        opacity={0.5}
-      />
+  if (fullscreen) {
+    return (
+      <div
+        style={{ position: "fixed", inset: 0, zIndex: 9999, background: BG, overflow: "hidden", cursor: "grab" }}
+        onWheel={onWheel} onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+      >
+        <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10000, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ color: T_MUTED, fontSize: 11 }}>Scroll to zoom · Drag to pan</span>
+          <button
+            onClick={() => { setFullscreen(false); setScale(1); setTranslate({ x: 0, y: 0 }); }}
+            style={{ background: C_LEAF, border: "1px solid #334155", borderRadius: 8, padding: "8px 14px", color: T_WHITE, cursor: "pointer", fontSize: 13 }}
+          >
+            ✕ Close
+          </button>
+        </div>
+        <div style={{
+          transform: `translate(calc(-50% + ${translate.x}px), calc(-50% + ${translate.y}px)) scale(${scale})`,
+          transformOrigin: "center center",
+          position: "absolute", top: "50%", left: "50%",
+        }}>
+          {map}
+        </div>
+      </div>
     );
-
-    // Children (leaves) — max 2
-    const children = (branch.children ?? []).slice(0, MAX_BULLETS);
-    const childCount = children.length;
-
-    // Spread must satisfy: 2 * BULLET_RADIUS * sin(spread/2) >= LEAF_W + 30px gap
-    // Also must not exceed 65% of the inter-branch gap to avoid neighbour collision
-    const interBranchGap = (2 * Math.PI) / branchCount;
-    const minSpread = 2 * Math.asin((LEAF_W + 30) / (2 * BULLET_RADIUS)); // geometry-enforced minimum
-    const maxSpread = Math.min(Math.PI * 60 / 180, interBranchGap * 0.65);
-    const spread = childCount > 1 ? Math.max(minSpread, maxSpread) : 0;
-
-    children.forEach((child, bi) => {
-      const startAngle = angle - spread / 2;
-      const leafAngle = childCount > 1
-        ? startAngle + (spread / (childCount - 1)) * bi
-        : angle;
-
-      const [bx, by] = polar(sx, sy, leafAngle, BULLET_RADIUS);
-
-      // Line: branch → leaf
-      lines.push(
-        <path
-          key={`line-leaf-${si}-${bi}`}
-          d={bezierPath(sx, sy, bx, by)}
-          stroke="#6b7280"
-          strokeWidth={1.5}
-          fill="none"
-          opacity={0.4}
-          strokeDasharray="4 3"
-        />
-      );
-
-      // Leaf node
-      nodes.push(
-        <NodeBox
-          key={`leaf-${si}-${bi}`}
-          x={bx}
-          y={by}
-          text={child.label}
-          fill="#f3f4f6"
-          textColor="#374151"
-          width={LEAF_W}
-          height={LEAF_H}
-          rx={8}
-          fontSize={10}
-        />
-      );
-    });
-
-    // Branch node (rendered after leaves so it sits on top)
-    nodes.push(
-      <NodeBox
-        key={`branch-${si}`}
-        x={sx}
-        y={sy}
-        text={branch.label}
-        fill="#4f46e5"
-        textColor="#ffffff"
-        width={148}
-        height={62}
-        rx={10}
-        fontSize={11}
-        fontWeight="600"
-      />
-    );
-  });
-
-  // Center node — rendered last so it sits on top of all lines
-  const centerNode = (
-    <NodeBox
-      key="center"
-      x={CX}
-      y={CY}
-      text={data.root}
-      fill="#7c3aed"
-      textColor="#ffffff"
-      width={170}
-      height={74}
-      rx={14}
-      fontSize={13}
-      fontWeight="700"
-    />
-  );
+  }
 
   return (
-    <svg
-      viewBox="0 0 1000 960"
-      width="100%"
-      aria-label="Mind map"
-      style={{ display: "block", background: "#ffffff" }}
-    >
-      {lines}
-      {nodes}
-      {centerNode}
-    </svg>
+    <div style={{ position: "relative", background: BG, borderRadius: 12, overflow: "hidden" }}>
+      <button
+        onClick={() => setFullscreen(true)}
+        style={{
+          position: "absolute", top: 12, right: 12, zIndex: 10,
+          background: C_LEAF, border: "1px solid #334155", borderRadius: 8,
+          padding: "6px 12px", color: T_MUTED, cursor: "pointer", fontSize: 12,
+        }}
+      >
+        ⛶ Fullscreen
+      </button>
+      <div style={{ overflow: "auto", maxHeight: 560 }}>
+        {map}
+      </div>
+    </div>
   );
 }
