@@ -254,7 +254,20 @@ export default function MindMap({ root, sections }: Props) {
       <div
         style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f9fafb", overflow: "hidden", cursor: "grab", userSelect: "none", touchAction: "none" }}
         onWheel={onWheel} onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-        onDoubleClick={(e) => e.preventDefault()}
+        onDoubleClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const mx = e.clientX - (rect.left + rect.width / 2);
+          const my = e.clientY - (rect.top + rect.height / 2);
+          const factor = 1.5;
+          setScale(prev => {
+            const next = Math.min(3, prev * factor);
+            setTranslate(t => ({
+              x: mx - (mx - t.x) * (next / prev),
+              y: my - (my - t.y) * (next / prev),
+            }));
+            return next;
+          });
+        }}
       >
         <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10000, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ color: "#9ca3af", fontSize: 11 }}>Scroll to zoom · Drag to pan</span>
