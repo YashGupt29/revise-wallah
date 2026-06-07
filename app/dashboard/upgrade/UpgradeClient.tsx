@@ -46,49 +46,17 @@ const MINUTES_VALUE: Record<Plan, string> = {
   pro: "Unlimited",
 };
 
-// Card accent config per plan
+// Card config — all purple, only elevation/badge varies
 const CARD_STYLE: Record<Plan, {
-  border: string; badge?: string; badgeBg: string; badgeText: string;
-  btnBg: string; btnText: string; headerText: string; checkColor: string;
+  border: string;
+  badge?: string;
+  glow: boolean;
+  btnBg: string;
 }> = {
-  free: {
-    border: "border-gray-700",
-    badgeBg: "", badgeText: "",
-    btnBg: "bg-gray-700 hover:bg-gray-600",
-    btnText: "text-gray-300",
-    headerText: "text-gray-300",
-    checkColor: "text-gray-500",
-  },
-  student: {
-    border: "border-purple-500",
-    badge: "Most Popular",
-    badgeBg: "bg-purple-500",
-    badgeText: "text-white",
-    btnBg: "bg-purple-600 hover:bg-purple-500",
-    btnText: "text-white",
-    headerText: "text-purple-300",
-    checkColor: "text-purple-400",
-  },
-  premium: {
-    border: "border-violet-400",
-    badge: "Best Value",
-    badgeBg: "bg-violet-500",
-    badgeText: "text-white",
-    btnBg: "bg-violet-600 hover:bg-violet-500",
-    btnText: "text-white",
-    headerText: "text-violet-300",
-    checkColor: "text-violet-400",
-  },
-  pro: {
-    border: "border-amber-400",
-    badge: "All Features",
-    badgeBg: "bg-amber-400",
-    badgeText: "text-gray-900",
-    btnBg: "bg-amber-400 hover:bg-amber-300",
-    btnText: "text-gray-900",
-    headerText: "text-amber-300",
-    checkColor: "text-amber-400",
-  },
+  free:    { border: "border-gray-700",    badge: undefined,       glow: false, btnBg: "bg-gray-700 hover:bg-gray-600 text-gray-300" },
+  student: { border: "border-purple-500",  badge: "Most Popular",  glow: true,  btnBg: "bg-purple-600 hover:bg-purple-500 text-white" },
+  premium: { border: "border-purple-400",  badge: "Best Value",    glow: false, btnBg: "bg-purple-600 hover:bg-purple-500 text-white" },
+  pro:     { border: "border-purple-300",  badge: "All Features",  glow: false, btnBg: "bg-purple-600 hover:bg-purple-500 text-white" },
 };
 
 export default function UpgradeClient({ currentPlan }: { currentPlan: Plan }) {
@@ -205,29 +173,23 @@ export default function UpgradeClient({ currentPlan }: { currentPlan: Plan }) {
           const isCurrent = plan.id === currentPlan;
           const isDowngrade = planRank(plan.id) < planRank(currentPlan);
           const isLoading = loading === plan.id;
-          const isPopular = plan.id === "student";
 
           return (
             <div
               key={plan.id}
               className={`relative flex flex-col rounded-2xl border-2 bg-gray-900 p-6 ${style.border} ${
-                isPopular ? "shadow-lg shadow-purple-900/40" : ""
+                style.glow ? "shadow-lg shadow-purple-900/50" : ""
               }`}
             >
               {/* Badge */}
-              {style.badge && (
-                <div className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ${style.badgeBg} ${style.badgeText}`}>
+              {(style.badge || isCurrent) && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap bg-purple-600 text-white">
                   {isCurrent ? "Current plan" : style.badge}
-                </div>
-              )}
-              {!style.badge && isCurrent && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap bg-gray-600 text-white">
-                  Current plan
                 </div>
               )}
 
               {/* Plan name */}
-              <div className={`text-xs font-semibold uppercase tracking-widest mb-1 ${style.headerText}`}>
+              <div className="text-xs font-semibold uppercase tracking-widest text-purple-400 mb-1">
                 {plan.label}
               </div>
 
@@ -241,12 +203,11 @@ export default function UpgradeClient({ currentPlan }: { currentPlan: Plan }) {
                     <span className="text-base font-normal text-gray-400">/mo</span>
                   </p>
                 )}
-                <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${style.headerText}`}>
-                  {plan.id === "pro" ? (
-                    <><Crown className="w-3 h-3" /> Unlimited minutes</>
-                  ) : (
-                    <><Zap className="w-3 h-3" /> {MINUTES_VALUE[plan.id]} / month</>
-                  )}
+                <p className="text-xs font-semibold mt-1 text-purple-400 flex items-center gap-1">
+                  {plan.id === "pro"
+                    ? <><Crown className="w-3 h-3" /> Unlimited minutes</>
+                    : <><Zap className="w-3 h-3" /> {MINUTES_VALUE[plan.id]} / month</>
+                  }
                 </p>
               </div>
 
@@ -260,7 +221,7 @@ export default function UpgradeClient({ currentPlan }: { currentPlan: Plan }) {
                   onClick={() => handleUpgrade(plan)}
                   disabled={isCurrent || isDowngrade || !!loading}
                   className={`w-full py-2.5 rounded-xl text-sm font-semibold mb-6 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isCurrent || isDowngrade ? "bg-gray-800 text-gray-500" : `${style.btnBg} ${style.btnText}`
+                    isCurrent || isDowngrade ? "bg-gray-800 text-gray-500" : style.btnBg
                   }`}
                 >
                   {isCurrent ? "Active" : isDowngrade ? "—" : isLoading ? "Opening…" : `Get ${plan.label}`}
@@ -273,7 +234,7 @@ export default function UpgradeClient({ currentPlan }: { currentPlan: Plan }) {
                   if (key === "minutes") {
                     return (
                       <li key={key} className="flex items-center gap-2.5 text-sm">
-                        <Check className={`w-4 h-4 flex-shrink-0 ${style.checkColor}`} />
+                        <Check className="w-4 h-4 flex-shrink-0 text-purple-400" />
                         <span className="text-white font-semibold">{MINUTES_VALUE[plan.id]}</span>
                         <span className="text-gray-500 text-xs">video minutes</span>
                       </li>
@@ -283,7 +244,7 @@ export default function UpgradeClient({ currentPlan }: { currentPlan: Plan }) {
                   return (
                     <li key={key} className={`flex items-center gap-2.5 text-sm ${included ? "text-gray-200" : "text-gray-600"}`}>
                       {included
-                        ? <Check className={`w-4 h-4 flex-shrink-0 ${style.checkColor}`} />
+                        ? <Check className="w-4 h-4 flex-shrink-0 text-purple-400" />
                         : <X className="w-4 h-4 flex-shrink-0 text-gray-700" />
                       }
                       <span>{label}</span>
