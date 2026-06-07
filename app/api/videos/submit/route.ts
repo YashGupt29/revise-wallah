@@ -23,9 +23,12 @@ import { assertSufficientMinutes, InsufficientMinutesError } from "@/lib/pipelin
 import { triggerPipeline } from "@/lib/pipeline/modal";
 import { fetchTranscript } from "@/lib/pipeline/transcript";
 import { track } from "@/lib/mixpanel";
+import { calculateMinutesCost } from "@/lib/jobs/types";
 
 const CACHE_HIT_COST = 5;
-const DEFAULT_MISS_COST = 15;
+// Minimum possible cost — used only to gate submission before we know duration.
+// Actual cost (based on real video duration) is deducted on job completion.
+const MIN_COST = calculateMinutesCost(0); // → 5
 
 export async function POST(req: NextRequest) {
   // ── Auth ─────────────────────────────────────────────────────────────────
@@ -108,7 +111,7 @@ export async function POST(req: NextRequest) {
 
   // ── Assert minutes ────────────────────────────────────────────────────────
   try {
-    await assertSufficientMinutes(user.id, DEFAULT_MISS_COST);
+    await assertSufficientMinutes(user.id, MIN_COST);
   } catch (err) {
     if (err instanceof InsufficientMinutesError) {
       return NextResponse.json(
